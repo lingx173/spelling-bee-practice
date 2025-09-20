@@ -100,7 +100,7 @@ class TTSService {
       utterance.onerror = (event) => reject(new Error(`Speech synthesis error: ${event.error}`))
       
       // Speak
-      this.synth.speak(utterance)
+      this.synth?.speak(utterance)
     })
   }
 

@@ -1,24 +1,12 @@
 import { useEffect, useState } from 'react'
-import { useRegisterSW } from 'virtual:pwa-register/react'
 import { X, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export function PWAUpdateNotification() {
   const [showInstallPrompt, setShowInstallPrompt] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
-
-  const {
-    offlineReady: [offlineReady, setOfflineReady],
-    needRefresh: [needRefresh, setNeedRefresh],
-    updateServiceWorker,
-  } = useRegisterSW({
-    onRegistered(r) {
-      console.log('SW Registered: ' + r)
-    },
-    onRegisterError(error) {
-      console.log('SW registration error', error)
-    },
-  })
+  const [needRefresh, setNeedRefresh] = useState(false)
+  const [offlineReady, setOfflineReady] = useState(false)
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -60,7 +48,7 @@ export function PWAUpdateNotification() {
   }
 
   const handleUpdateClick = () => {
-    updateServiceWorker(true)
+    window.location.reload()
   }
 
   return (

@@ -60,8 +60,8 @@ export class WordService {
     return await db.words
       .filter(word => 
         word.text.toLowerCase().includes(lowerQuery) ||
-        word.sourceList?.toLowerCase().includes(lowerQuery) ||
-        word.tags?.some(tag => tag.toLowerCase().includes(lowerQuery))
+        (word.sourceList?.toLowerCase().includes(lowerQuery) ?? false) ||
+        (word.tags?.some(tag => tag.toLowerCase().includes(lowerQuery)) ?? false)
       )
       .toArray()
   }
