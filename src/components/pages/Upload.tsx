@@ -8,6 +8,7 @@ import { PDFParseResult } from '../../types'
 
 export function Upload() {
   const [isProcessing, setIsProcessing] = useState(false)
+  const [processingStep, setProcessingStep] = useState<string>('')
   const [parseResult, setParseResult] = useState<PDFParseResult | null>(null)
   const [selectedWords, setSelectedWords] = useState<Set<string>>(new Set())
   const [searchFilter, setSearchFilter] = useState('')
@@ -26,22 +27,46 @@ export function Upload() {
     }
 
     setIsProcessing(true)
+    setProcessingStep('Loading PDF...')
     
     try {
+      // Set up progress tracking
+      const originalConsoleLog = console.log
+      console.log = (...args) => {
+        originalConsoleLog(...args)
+        if (args[0]?.includes('OCR Progress:')) {
+          setProcessingStep(`OCR Processing: ${args[0].split(': ')[1]}`)
+        } else if (args[0]?.includes('Starting OCR processing')) {
+          setProcessingStep('Starting OCR processing...')
+        } else if (args[0]?.includes('Converting PDF to image')) {
+          setProcessingStep('Converting PDF to image...')
+        } else if (args[0]?.includes('OCR successful')) {
+          setProcessingStep('OCR completed successfully!')
+        }
+      }
+
       const result = await pdfParsingService.parseFile(file)
+      
+      // Restore original console.log
+      console.log = originalConsoleLog
+      
       setParseResult(result)
       setWords(result.words)
       
       // Initially select all words
       setSelectedWords(new Set(result.words))
       
-      toast.success(`Found ${result.words.length} words in the PDF`)
+      const method = result.metadata.note?.includes('OCR') ? 'OCR' : 
+                    result.metadata.note?.includes('filename') ? 'filename' : 'test'
+      
+      toast.success(`Found ${result.words.length} words using ${method}`)
     } catch (error) {
       console.error('PDF processing error:', error)
       const errorMessage = error instanceof Error ? error.message : 'Failed to process PDF. Please try again.'
       toast.error(errorMessage)
     } finally {
       setIsProcessing(false)
+      setProcessingStep('')
     }
   }
 
@@ -175,9 +200,16 @@ export function Upload() {
             </label>
             
             {isProcessing && (
-              <div className="flex items-center justify-center mt-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600 mr-3"></div>
-                <span className="text-gray-600">Extracting words from PDF...</span>
+              <div className="flex flex-col items-center justify-center mt-4">
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600 mr-3"></div>
+                  <span className="text-gray-600">{processingStep || 'Extracting words from PDF...'}</span>
+                </div>
+                {processingStep.includes('OCR') && (
+                  <div className="mt-2 text-sm text-gray-500">
+                    This may take a moment for scanned documents...
+                  </div>
+                )}
               </div>
             )}
           </div>
