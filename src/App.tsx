@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
+import { useEffect } from 'react'
 import { Home } from './components/pages/Home'
 import { Practice } from './components/pages/Practice'
 import { Upload } from './components/pages/Upload'
@@ -7,8 +8,22 @@ import { WordList } from './components/pages/WordList'
 import { Settings } from './components/pages/Settings'
 import { Layout } from './components/layout/Layout'
 import { PWAUpdateNotification } from './components/ui/PWAUpdateNotification'
+import { ttsService } from './services/tts'
 
 function App() {
+  // Initialize TTS service when app loads
+  useEffect(() => {
+    const initTTS = async () => {
+      try {
+        await ttsService.ensureReady()
+        console.log('TTS service initialized successfully')
+      } catch (error) {
+        console.warn('TTS service initialization failed:', error)
+      }
+    }
+    
+    initTTS()
+  }, [])
   return (
     <Router>
       <div className="min-h-screen bg-gray-50">

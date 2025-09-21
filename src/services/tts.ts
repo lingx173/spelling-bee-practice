@@ -26,6 +26,37 @@ class TTSService {
     }
   }
 
+  public async ensureReady(): Promise<void> {
+    if (!this.isSupported) {
+      throw new Error('Text-to-speech is not supported in this browser')
+    }
+
+    // If voices are already loaded, we're ready
+    if (this.voices.length > 0) {
+      return
+    }
+
+    // Wait for voices to be loaded with a timeout
+    return new Promise((resolve) => {
+      let attempts = 0
+      const maxAttempts = 50 // 5 seconds max wait
+      
+      const checkVoices = () => {
+        attempts++
+        
+        if (this.voices.length > 0) {
+          resolve()
+        } else if (attempts >= maxAttempts) {
+          console.warn('TTS voices not loaded after timeout, proceeding anyway')
+          resolve() // Resolve anyway to not block the app
+        } else {
+          setTimeout(checkVoices, 100)
+        }
+      }
+      checkVoices()
+    })
+  }
+
   private loadVoices(): void {
     if (!this.synth) return
     
@@ -77,6 +108,9 @@ class TTSService {
     if (!this.isSupported || !this.synth) {
       throw new Error('Text-to-speech is not supported in this browser')
     }
+
+    // Ensure TTS is ready before speaking
+    await this.ensureReady()
 
     // Cancel any ongoing speech
     this.synth.cancel()
