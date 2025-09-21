@@ -412,7 +412,7 @@ function Upload() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingStep, setProcessingStep] = useState('')
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle')
-  const [uploadResult, setUploadResult] = useState<{wordsCount: number, filename: string, duplicates: number} | null>(null)
+  const [uploadResult, setUploadResult] = useState<{wordsCount: number, filename: string, duplicates: number, method?: string} | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleAddSingleWord = () => {
@@ -468,6 +468,19 @@ function Upload() {
     setMessage('')
     console.log('Starting PDF processing...')
     
+    // Update processing step for OCR
+    setTimeout(() => {
+      if (isProcessing) {
+        setProcessingStep('Converting PDF to image...')
+      }
+    }, 1000)
+    
+    setTimeout(() => {
+      if (isProcessing) {
+        setProcessingStep('Running OCR recognition...')
+      }
+    }, 3000)
+    
     try {
       const result = await pdfParsingService.parseFile(file)
       console.log('PDF processing result:', result)
@@ -478,7 +491,8 @@ function Upload() {
         setUploadResult({ 
           wordsCount: addResult.addedCount, 
           filename: file.name,
-          duplicates: addResult.duplicateCount
+          duplicates: addResult.duplicateCount,
+          method: result.metadata.method
         })
         setMessage(addResult.message)
         
@@ -643,6 +657,11 @@ function Upload() {
                         {uploadResult.duplicates > 0 && (
                           <span className="block text-orange-600">
                             ({uploadResult.duplicates} duplicates skipped)
+                          </span>
+                        )}
+                        {uploadResult.method === 'ocr' && (
+                          <span className="block text-blue-600 text-xs">
+                            ✓ Extracted using OCR from scanned document
                           </span>
                         )}
                       </p>
