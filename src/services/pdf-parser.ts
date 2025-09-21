@@ -1,8 +1,17 @@
 import * as pdfjsLib from 'pdfjs-dist'
 import { PDFParseResult } from '../types'
 
-// Set up PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+// Set up PDF.js worker - use a more reliable worker source
+try {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+    'pdfjs-dist/build/pdf.worker.min.js',
+    import.meta.url
+  ).toString()
+} catch (error) {
+  // Fallback to CDN if local worker fails
+  console.warn('Failed to load local PDF.js worker, falling back to CDN')
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+}
 
 export class PDFParsingService {
   private readonly WORD_REGEX = /[A-Za-z][A-Za-z\-']{1,29}/g
@@ -25,12 +34,39 @@ export class PDFParsingService {
 
   public async parseFile(file: File): Promise<PDFParseResult> {
     try {
+      // Validate file
+      if (!file || file.size === 0) {
+        throw new Error('Invalid file: File is empty or corrupted')
+      }
+
+      if (file.size > 50 * 1024 * 1024) { // 50MB limit
+        throw new Error('File too large: Please upload a PDF smaller than 50MB')
+      }
+
+      console.log('Starting PDF parsing for file:', file.name, 'Size:', file.size)
+      
       const arrayBuffer = await file.arrayBuffer()
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+      console.log('File converted to array buffer, size:', arrayBuffer.byteLength)
+      
+      const pdf = await pdfjsLib.getDocument({ 
+        data: arrayBuffer,
+        verbosity: 0 // Reduce console output
+      }).promise
+      
+      console.log('PDF loaded successfully, pages:', pdf.numPages)
       
       const textContent = await this.extractTextFromPDF(pdf)
+      console.log('Text extracted, length:', textContent.length)
+      
       const words = this.extractWordsFromText(textContent)
+      console.log('Words extracted:', words.length)
+      
       const cleanedWords = this.cleanAndDeduplicateWords(words)
+      console.log('Words after cleaning:', cleanedWords.length)
+      
+      if (cleanedWords.length === 0) {
+        throw new Error('No valid words found in PDF. The PDF might be image-based or contain no readable text.')
+      }
       
       return {
         words: cleanedWords,
@@ -42,7 +78,20 @@ export class PDFParsingService {
       }
     } catch (error) {
       console.error('PDF parsing error:', error)
-      throw new Error(`Failed to parse PDF: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Invalid PDF')) {
+          throw new Error('Invalid PDF file. Please ensure the file is a valid PDF document.')
+        } else if (error.message.includes('password')) {
+          throw new Error('Password-protected PDF. Please remove password protection and try again.')
+        } else if (error.message.includes('corrupted')) {
+          throw new Error('Corrupted PDF file. Please try a different file.')
+        } else {
+          throw new Error(`Failed to parse PDF: ${error.message}`)
+        }
+      } else {
+        throw new Error('Failed to parse PDF: Unknown error occurred')
+      }
     }
   }
 

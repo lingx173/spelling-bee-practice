@@ -38,7 +38,8 @@ export function Upload() {
       toast.success(`Found ${result.words.length} words in the PDF`)
     } catch (error) {
       console.error('PDF processing error:', error)
-      toast.error('Failed to process PDF. Please try again.')
+      const errorMessage = error instanceof Error ? error.message : 'Failed to process PDF. Please try again.'
+      toast.error(errorMessage)
     } finally {
       setIsProcessing(false)
     }
