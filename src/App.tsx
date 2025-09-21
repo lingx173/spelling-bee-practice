@@ -10,6 +10,16 @@ import { Layout } from './components/layout/Layout'
 import { PWAUpdateNotification } from './components/ui/PWAUpdateNotification'
 import { ttsService } from './services/tts'
 
+// Add error boundary for individual components
+const SafeComponent = ({ children, name }: { children: ReactNode; name: string }) => {
+  try {
+    return <>{children}</>
+  } catch (error) {
+    console.error(`Error in ${name}:`, error)
+    return <div>Error loading {name}</div>
+  }
+}
+
 // Simple error boundary component
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -75,30 +85,36 @@ function App() {
     <ErrorBoundary>
       <Router>
         <div className="min-h-screen bg-gray-50">
-          <Layout>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/practice" element={<Practice />} />
-              <Route path="/upload" element={<Upload />} />
-              <Route path="/words" element={<WordList />} />
-              <Route path="/settings" element={<Settings />} />
-            </Routes>
-          </Layout>
+          <SafeComponent name="Layout">
+            <Layout>
+              <Routes>
+                <Route path="/" element={<SafeComponent name="Home"><Home /></SafeComponent>} />
+                <Route path="/practice" element={<SafeComponent name="Practice"><Practice /></SafeComponent>} />
+                <Route path="/upload" element={<SafeComponent name="Upload"><Upload /></SafeComponent>} />
+                <Route path="/words" element={<SafeComponent name="WordList"><WordList /></SafeComponent>} />
+                <Route path="/settings" element={<SafeComponent name="Settings"><Settings /></SafeComponent>} />
+              </Routes>
+            </Layout>
+          </SafeComponent>
           
-          <Toaster
-            position="top-center"
-            toastOptions={{
-              duration: 4000,
-              style: {
-                background: '#363636',
-                color: '#fff',
-                fontSize: '16px',
-                padding: '12px 16px',
-              },
-            }}
-          />
+          <SafeComponent name="Toaster">
+            <Toaster
+              position="top-center"
+              toastOptions={{
+                duration: 4000,
+                style: {
+                  background: '#363636',
+                  color: '#fff',
+                  fontSize: '16px',
+                  padding: '12px 16px',
+                },
+              }}
+            />
+          </SafeComponent>
           
-          <PWAUpdateNotification />
+          <SafeComponent name="PWAUpdateNotification">
+            <PWAUpdateNotification />
+          </SafeComponent>
         </div>
       </Router>
     </ErrorBoundary>
