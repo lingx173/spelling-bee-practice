@@ -411,6 +411,8 @@ function Upload() {
   const [message, setMessage] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingStep, setProcessingStep] = useState('')
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle')
+  const [uploadResult, setUploadResult] = useState<{wordsCount: number, filename: string} | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleAddSingleWord = () => {
@@ -444,18 +446,26 @@ function Upload() {
     
     if (!file) {
       console.log('No file selected')
+      setUploadStatus('idle')
       return
     }
 
     console.log('File type:', file.type, 'Size:', file.size)
 
     if (file.type !== 'application/pdf') {
+      setUploadStatus('error')
       setMessage('Please select a PDF file')
+      setTimeout(() => {
+        setUploadStatus('idle')
+        setMessage('')
+      }, 3000)
       return
     }
 
+    setUploadStatus('processing')
     setIsProcessing(true)
     setProcessingStep('Processing PDF...')
+    setMessage('')
     console.log('Starting PDF processing...')
     
     try {
@@ -464,15 +474,33 @@ function Upload() {
       
       if (result.words.length > 0) {
         addWords(result.words, difficulty)
-        setMessage(`Successfully imported ${result.words.length} words from PDF!`)
-        setTimeout(() => setMessage(''), 5000)
+        setUploadStatus('success')
+        setUploadResult({ wordsCount: result.words.length, filename: file.name })
+        setMessage(`Successfully imported ${result.words.length} words from "${file.name}"!`)
+        
+        // Auto-reset after 5 seconds
+        setTimeout(() => {
+          setUploadStatus('idle')
+          setUploadResult(null)
+          setMessage('')
+        }, 5000)
       } else {
+        setUploadStatus('error')
         setMessage('No words found in the PDF')
+        setTimeout(() => {
+          setUploadStatus('idle')
+          setMessage('')
+        }, 3000)
       }
     } catch (error) {
       console.error('PDF processing error:', error)
+      setUploadStatus('error')
       const errorMessage = error instanceof Error ? error.message : 'Failed to process PDF. Please try again.'
       setMessage(errorMessage)
+      setTimeout(() => {
+        setUploadStatus('idle')
+        setMessage('')
+      }, 5000)
     } finally {
       setIsProcessing(false)
       setProcessingStep('')
@@ -578,39 +606,124 @@ function Upload() {
             </div>
 
             {/* PDF Upload */}
-            <div className="bg-orange-50 rounded-lg p-6">
+            <div className={`rounded-lg p-6 transition-colors ${
+              uploadStatus === 'success' ? 'bg-green-50 border-2 border-green-200' :
+              uploadStatus === 'error' ? 'bg-red-50 border-2 border-red-200' :
+              uploadStatus === 'processing' ? 'bg-blue-50 border-2 border-blue-200' :
+              'bg-orange-50 border border-orange-200'
+            }`}>
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Upload PDF Document</h2>
               <p className="text-sm text-gray-600 mb-4">Upload a PDF file to automatically extract words for practice:</p>
+              
               <div className="space-y-4">
-                <div>
+                {/* Upload Status Display */}
+                {uploadStatus === 'processing' && (
+                  <div className="flex items-center p-4 bg-blue-100 rounded-lg">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
+                    <div>
+                      <p className="font-medium text-blue-800">Processing PDF...</p>
+                      <p className="text-sm text-blue-600">{processingStep}</p>
+                    </div>
+                  </div>
+                )}
+
+                {uploadStatus === 'success' && uploadResult && (
+                  <div className="flex items-center p-4 bg-green-100 rounded-lg">
+                    <svg className="w-6 h-6 text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <div>
+                      <p className="font-medium text-green-800">Upload Successful!</p>
+                      <p className="text-sm text-green-600">
+                        Imported {uploadResult.wordsCount} words from "{uploadResult.filename}"
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {uploadStatus === 'error' && (
+                  <div className="flex items-center p-4 bg-red-100 rounded-lg">
+                    <svg className="w-6 h-6 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    <div>
+                      <p className="font-medium text-red-800">Upload Failed</p>
+                      <p className="text-sm text-red-600">{message}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* File Input */}
+                <div className="relative">
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept=".pdf"
                     onChange={handlePDFUpload}
                     disabled={isProcessing}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:opacity-50"
+                    className={`w-full px-4 py-3 border-2 rounded-lg transition-colors ${
+                      uploadStatus === 'success' ? 'border-green-300 bg-green-50' :
+                      uploadStatus === 'error' ? 'border-red-300 bg-red-50' :
+                      uploadStatus === 'processing' ? 'border-blue-300 bg-blue-50' :
+                      'border-orange-300 focus:ring-orange-500 focus:border-orange-500'
+                    } disabled:opacity-50`}
                     style={{ display: 'block' }}
                   />
-                  <div className="mt-2 text-xs text-gray-500">
-                    <p>Debug: File input should trigger onChange when PDF is selected</p>
-                    <button
-                      onClick={() => {
-                        console.log('Test button clicked')
-                        setMessage('Test: This should work if the component is functioning')
-                        setTimeout(() => setMessage(''), 3000)
-                      }}
-                      className="mt-2 px-3 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700"
-                    >
-                      Test Button
-                    </button>
-                  </div>
+                  
+                  {/* Upload Icon Overlay */}
+                  {uploadStatus === 'idle' && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="text-center">
+                        <svg className="w-8 h-8 text-orange-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <p className="text-sm text-orange-600 font-medium">Click to select PDF file</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="text-xs text-gray-500">
+
+                {/* File Requirements */}
+                <div className="text-xs text-gray-500 space-y-1">
                   <p>• Maximum file size: 10MB</p>
                   <p>• Supported format: PDF only</p>
                   <p>• Words will be extracted and added to your word list</p>
+                  <p>• Processing may take a few seconds</p>
                 </div>
+
+                {/* Action Buttons */}
+                {uploadStatus === 'success' && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setUploadStatus('idle')
+                        setUploadResult(null)
+                        setMessage('')
+                      }}
+                      className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                      Upload Another File
+                    </button>
+                    <Link
+                      to="/words"
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      View Word List
+                    </Link>
+                  </div>
+                )}
+
+                {uploadStatus === 'error' && (
+                  <button
+                    onClick={() => {
+                      setUploadStatus('idle')
+                      setMessage('')
+                    }}
+                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                  >
+                    Try Again
+                  </button>
+                )}
               </div>
             </div>
 
