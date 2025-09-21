@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Test</title>
+</head>
+<body>
+    <div id="root">
+        <h1>Simple Test Page</h1>
+        <p>If you see this, basic HTML is working.</p>
+        <p>Current time: <span id="time"></span></p>
+        <button onclick="testJS()">Test JavaScript</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        console.log('Simple test script starting...');
+        
+        // Test basic JavaScript
+        function testJS() {
+            document.getElementById('result').innerHTML = 'JavaScript is working!';
+            console.log('JavaScript test successful');
+        }
+        
+        // Update time
+        function updateTime() {
+            document.getElementById('time').textContent = new Date().toLocaleString();
+        }
+        
+        updateTime();
+        setInterval(updateTime, 1000);
+        
+        console.log('Simple test script loaded successfully');
+    </script>
+</body>
+</html>
