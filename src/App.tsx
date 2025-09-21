@@ -1239,16 +1239,38 @@ function Settings() {
 }
 
 function App() {
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    // Simulate app initialization
+    const timer = setTimeout(() => {
+      setIsLoading(false)
+    }, 100)
+
+    return () => clearTimeout(timer)
+  }, [])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading Spelling Bee Practice...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <Router>
       <div className="min-h-screen bg-gray-50">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/practice" element={<Practice />} />
-            <Route path="/upload" element={<Upload />} />
-            <Route path="/words" element={<WordList />} />
-            <Route path="/settings" element={<Settings />} />
-          </Routes>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/practice" element={<Practice />} />
+          <Route path="/upload" element={<Upload />} />
+          <Route path="/words" element={<WordList />} />
+          <Route path="/settings" element={<Settings />} />
+        </Routes>
       </div>
     </Router>
   )
