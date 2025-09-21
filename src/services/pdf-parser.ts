@@ -1,8 +1,9 @@
 import * as pdfjsLib from 'pdfjs-dist'
 import { PDFParseResult } from '../types'
 
-// Set up PDF.js worker - use jsDelivr CDN for better reliability
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`
+// Disable PDF.js worker to avoid loading issues
+// This will use the main thread for PDF processing (slower but more reliable)
+pdfjsLib.GlobalWorkerOptions.workerSrc = ''
 
 export class PDFParsingService {
   private readonly WORD_REGEX = /[A-Za-z][A-Za-z\-']{1,29}/g
@@ -39,12 +40,21 @@ export class PDFParsingService {
       const arrayBuffer = await file.arrayBuffer()
       console.log('File converted to array buffer, size:', arrayBuffer.byteLength)
       
-      const pdf = await pdfjsLib.getDocument({ 
+      // Add timeout to prevent hanging
+      const pdfPromise = pdfjsLib.getDocument({ 
         data: arrayBuffer,
         verbosity: 0, // Reduce console output
-        useWorkerFetch: false, // Disable worker fetch to avoid CORS issues
-        isEvalSupported: false // Disable eval for security
+        useWorkerFetch: false, // Disable worker fetch
+        isEvalSupported: false, // Disable eval for security
+        useSystemFonts: false, // Disable system fonts
+        disableFontFace: false // Allow font loading
       }).promise
+
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('PDF processing timeout')), 30000) // 30 second timeout
+      })
+
+      const pdf = await Promise.race([pdfPromise, timeoutPromise]) as pdfjsLib.PDFDocumentProxy
       
       console.log('PDF loaded successfully, pages:', pdf.numPages)
       
