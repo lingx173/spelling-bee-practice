@@ -1,17 +1,8 @@
 import * as pdfjsLib from 'pdfjs-dist'
 import { PDFParseResult } from '../types'
 
-// Set up PDF.js worker - use a more reliable worker source
-try {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.min.js',
-    import.meta.url
-  ).toString()
-} catch (error) {
-  // Fallback to CDN if local worker fails
-  console.warn('Failed to load local PDF.js worker, falling back to CDN')
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
-}
+// Set up PDF.js worker - use jsDelivr CDN for better reliability
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`
 
 export class PDFParsingService {
   private readonly WORD_REGEX = /[A-Za-z][A-Za-z\-']{1,29}/g
@@ -50,7 +41,9 @@ export class PDFParsingService {
       
       const pdf = await pdfjsLib.getDocument({ 
         data: arrayBuffer,
-        verbosity: 0 // Reduce console output
+        verbosity: 0, // Reduce console output
+        useWorkerFetch: false, // Disable worker fetch to avoid CORS issues
+        isEvalSupported: false // Disable eval for security
       }).promise
       
       console.log('PDF loaded successfully, pages:', pdf.numPages)
@@ -86,6 +79,8 @@ export class PDFParsingService {
           throw new Error('Password-protected PDF. Please remove password protection and try again.')
         } else if (error.message.includes('corrupted')) {
           throw new Error('Corrupted PDF file. Please try a different file.')
+        } else if (error.message.includes('worker') || error.message.includes('fetch')) {
+          throw new Error('PDF processing service unavailable. Please try again in a moment.')
         } else {
           throw new Error(`Failed to parse PDF: ${error.message}`)
         }
