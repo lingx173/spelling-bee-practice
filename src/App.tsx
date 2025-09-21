@@ -53,18 +53,51 @@ function Practice() {
   const [practiceMode, setPracticeMode] = useState<'all' | 'easy' | 'medium' | 'hard'>('all')
   const [score, setScore] = useState({ correct: 0, total: 0 })
   const [isPracticeActive, setIsPracticeActive] = useState(false)
+  const [settings, setSettings] = useState({
+    autoAdvance: false,
+    showHints: true,
+    practiceOrder: 'random' as 'random' | 'sequential',
+    difficulty: 'all' as 'all' | 'easy' | 'medium' | 'hard'
+  })
+  const [practiceWords, setPracticeWords] = useState<typeof words>([])
 
-  const filteredWords = practiceMode === 'all' 
-    ? words 
-    : words.filter(word => word.difficulty === practiceMode)
+  // Load settings from localStorage
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('spelling-bee-settings')
+    if (savedSettings) {
+      setSettings(JSON.parse(savedSettings))
+    }
+  }, [])
 
-  const currentWord = filteredWords[currentWordIndex]
+  // Shuffle array function
+  const shuffleArray = (array: typeof words) => {
+    const shuffled = [...array]
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
+    return shuffled
+  }
+
+  // Get filtered words based on practice mode
+  const getFilteredWords = () => {
+    const filtered = practiceMode === 'all' 
+      ? words 
+      : words.filter(word => word.difficulty === practiceMode)
+    
+    // Apply order setting
+    return settings.practiceOrder === 'random' ? shuffleArray(filtered) : filtered
+  }
+
+  const currentWord = practiceWords[currentWordIndex]
 
   const startPractice = () => {
-    if (filteredWords.length === 0) {
+    const filtered = getFilteredWords()
+    if (filtered.length === 0) {
       alert('No words available for practice! Please add some words first.')
       return
     }
+    setPracticeWords(filtered)
     setCurrentWordIndex(0)
     setScore({ correct: 0, total: 0 })
     setIsPracticeActive(true)
@@ -90,10 +123,17 @@ function Practice() {
       correct: prev.correct + (correct ? 1 : 0),
       total: prev.total + 1
     }))
+
+    // Auto-advance if enabled
+    if (settings.autoAdvance) {
+      setTimeout(() => {
+        nextWord()
+      }, 2000) // 2 second delay to show result
+    }
   }
 
   const nextWord = () => {
-    if (currentWordIndex < filteredWords.length - 1) {
+    if (currentWordIndex < practiceWords.length - 1) {
       setCurrentWordIndex(prev => prev + 1)
       setUserInput('')
       setShowResult(false)
@@ -127,7 +167,7 @@ function Practice() {
               </Link>
             </div>
 
-            {filteredWords.length === 0 ? (
+            {getFilteredWords().length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-lg text-gray-600 mb-4">No words available for practice!</p>
                 <Link 
@@ -158,7 +198,7 @@ function Practice() {
                       </select>
                     </div>
                     <div className="text-sm text-gray-600">
-                      <p>Words to practice: <span className="font-semibold">{filteredWords.length}</span></p>
+                      <p>Words to practice: <span className="font-semibold">{getFilteredWords().length}</span></p>
                     </div>
                   </div>
                 </div>
@@ -201,14 +241,16 @@ function Practice() {
             </div>
           </div>
 
-          <div className="text-center mb-8">
-            <div className="text-lg text-gray-600 mb-2">
-              Word {currentWordIndex + 1} of {filteredWords.length}
+          {settings.showHints && (
+            <div className="text-center mb-8">
+              <div className="text-lg text-gray-600 mb-2">
+                Word {currentWordIndex + 1} of {practiceWords.length}
+              </div>
+              <div className="text-sm text-gray-500">
+                Score: {score.correct}/{score.total} ({score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0}%)
+              </div>
             </div>
-            <div className="text-sm text-gray-500">
-              Score: {score.correct}/{score.total} ({score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0}%)
-            </div>
-          </div>
+          )}
 
           {currentWord && (
             <div className="space-y-8">
@@ -216,13 +258,15 @@ function Practice() {
                 <div className="text-6xl font-bold text-gray-900 mb-4">
                   {currentWord.text.toUpperCase()}
                 </div>
-                <div className={`inline-block px-3 py-1 text-sm rounded-full ${
-                  currentWord.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
-                  currentWord.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-red-100 text-red-800'
-                }`}>
-                  {currentWord.difficulty}
-                </div>
+                {settings.showHints && (
+                  <div className={`inline-block px-3 py-1 text-sm rounded-full ${
+                    currentWord.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
+                    currentWord.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {currentWord.difficulty}
+                  </div>
+                )}
               </div>
 
               <div className="max-w-md mx-auto">
@@ -256,12 +300,19 @@ function Practice() {
                       Correct spelling: <span className="font-semibold">{currentWord.text}</span>
                     </div>
                   )}
-                  <button
-                    onClick={nextWord}
-                    className="px-8 py-3 bg-green-600 text-white text-lg font-semibold rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    {currentWordIndex < filteredWords.length - 1 ? 'Next Word' : 'Finish Practice'}
-                  </button>
+                  {!settings.autoAdvance && (
+                    <button
+                      onClick={nextWord}
+                      className="px-8 py-3 bg-green-600 text-white text-lg font-semibold rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      {currentWordIndex < practiceWords.length - 1 ? 'Next Word' : 'Finish Practice'}
+                    </button>
+                  )}
+                  {settings.autoAdvance && (
+                    <div className="text-sm text-gray-500">
+                      Auto-advancing in 2 seconds...
+                    </div>
+                  )}
                 </div>
               )}
             </div>
