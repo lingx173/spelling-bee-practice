@@ -130,12 +130,14 @@ export class PDFParsingService {
       const { data: { text } } = await worker.recognize(imageDataUrl)
       
       console.log('OCR extracted text length:', text.length)
+      console.log('OCR extracted text sample:', text.substring(0, 1000))
       
       // Extract and clean words from OCR text
       const words = this.extractWordsFromText(text)
       const cleanedWords = this.cleanAndDeduplicateWords(words)
       
       console.log('OCR found', cleanedWords.length, 'unique words')
+      console.log('Sample cleaned words:', cleanedWords.slice(0, 30))
       
       return cleanedWords
     } finally {
@@ -200,18 +202,26 @@ export class PDFParsingService {
     const words: string[] = []
     const lines = text.split('\n')
     
+    console.log('OCR extracted text preview:', text.substring(0, 500))
+    console.log('Total lines to process:', lines.length)
+    
     for (const line of lines) {
       // Skip if line looks like noise
       if (this.isNoiseLine(line)) {
         continue
       }
       
-      // Extract words using regex
-      const matches = line.match(/[A-Za-z][A-Za-z\-']{1,29}/g)
+      // Extract words using more flexible regex
+      // Match words that start with a letter and contain letters, hyphens, or apostrophes
+      const matches = line.match(/[A-Za-z][A-Za-z\-']*/g)
       if (matches) {
+        console.log('Line matches:', line, '->', matches)
         words.push(...matches)
       }
     }
+    
+    console.log('Raw extracted words count:', words.length)
+    console.log('Sample words:', words.slice(0, 20))
     
     return words
   }
@@ -264,8 +274,8 @@ export class PDFParsingService {
   }
 
   private isValidWord(word: string): boolean {
-    // Length check
-    if (word.length < 2 || word.length > 30) {
+    // Length check - be more lenient
+    if (word.length < 1 || word.length > 50) {
       return false
     }
     
@@ -277,7 +287,8 @@ export class PDFParsingService {
     // Avoid words that are likely noise
     const noiseWords = [
       'www', 'http', 'https', 'com', 'org', 'net', 'edu',
-      'pdf', 'doc', 'docx', 'txt', 'jpg', 'png', 'gif'
+      'pdf', 'doc', 'docx', 'txt', 'jpg', 'png', 'gif',
+      'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'
     ]
     
     if (noiseWords.includes(word)) {
@@ -286,6 +297,11 @@ export class PDFParsingService {
     
     // Avoid words with too many repeated characters
     if (/([a-z])\1{3,}/.test(word)) {
+      return false
+    }
+    
+    // Avoid single letters unless they're common (a, i)
+    if (word.length === 1 && !['a', 'i'].includes(word)) {
       return false
     }
     
