@@ -1,7 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useWords } from './hooks/useWords'
 import { ttsService } from './services/tts'
+import { pdfParsingService } from './services/pdf-parser'
 
 function Home() {
   return (
@@ -395,6 +396,9 @@ function Upload() {
   const [wordList, setWordList] = useState('')
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium')
   const [message, setMessage] = useState('')
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [processingStep, setProcessingStep] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleAddSingleWord = () => {
     if (newWord.trim()) {
@@ -421,6 +425,42 @@ function Upload() {
     }
   }
 
+  const handlePDFUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (file.type !== 'application/pdf') {
+      setMessage('Please select a PDF file')
+      return
+    }
+
+    setIsProcessing(true)
+    setProcessingStep('Processing PDF...')
+    
+    try {
+      const result = await pdfParsingService.parseFile(file)
+      
+      if (result.words.length > 0) {
+        addWords(result.words, difficulty)
+        setMessage(`Successfully imported ${result.words.length} words from PDF!`)
+        setTimeout(() => setMessage(''), 5000)
+      } else {
+        setMessage('No words found in the PDF')
+      }
+    } catch (error) {
+      console.error('PDF processing error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to process PDF. Please try again.'
+      setMessage(errorMessage)
+    } finally {
+      setIsProcessing(false)
+      setProcessingStep('')
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-4xl mx-auto">
@@ -435,11 +475,24 @@ function Upload() {
             </Link>
           </div>
 
-          {message && (
-            <div className="mb-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg">
-              {message}
-            </div>
-          )}
+              {message && (
+                <div className={`mb-6 p-4 border rounded-lg ${
+                  message.includes('Successfully') || message.includes('Added') 
+                    ? 'bg-green-100 border-green-400 text-green-700'
+                    : 'bg-red-100 border-red-400 text-red-700'
+                }`}>
+                  {message}
+                </div>
+              )}
+
+              {isProcessing && (
+                <div className="mb-6 p-4 bg-blue-100 border border-blue-400 text-blue-700 rounded-lg">
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                    {processingStep}
+                  </div>
+                </div>
+              )}
 
           <div className="space-y-8">
             {/* Single Word Addition */}
@@ -499,6 +552,29 @@ function Upload() {
                 >
                   Add All Words
                 </button>
+              </div>
+            </div>
+
+            {/* PDF Upload */}
+            <div className="bg-orange-50 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">Upload PDF Document</h2>
+              <p className="text-sm text-gray-600 mb-4">Upload a PDF file to automatically extract words for practice:</p>
+              <div className="space-y-4">
+                <div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf"
+                    onChange={handlePDFUpload}
+                    disabled={isProcessing}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:opacity-50"
+                  />
+                </div>
+                <div className="text-xs text-gray-500">
+                  <p>• Maximum file size: 10MB</p>
+                  <p>• Supported format: PDF only</p>
+                  <p>• Words will be extracted and added to your word list</p>
+                </div>
               </div>
             </div>
 
