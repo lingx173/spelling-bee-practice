@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Static Test - Vercel</title>
+</head>
+<body>
+    <h1>Static HTML Test</h1>
+    <p>This is a completely static HTML file.</p>
+    <p>If you see this, Vercel is serving static files correctly.</p>
+    <p>Current time: <span id="time"></span></p>
+    
+    <h2>Test JavaScript</h2>
+    <button onclick="testJS()">Click me to test JavaScript</button>
+    <div id="result"></div>
+    
+    <h2>Test Links</h2>
+    <a href="/test.html">Go to test.html</a><br>
+    <a href="/simple-test.html">Go to simple-test.html</a><br>
+    <a href="/">Go to main page</a>
+    
+    <script>
+        console.log('Static test page loaded');
+        
+        function testJS() {
+            document.getElementById('result').innerHTML = 'JavaScript works!';
+            console.log('JavaScript test successful');
+        }
+        
+        function updateTime() {
+            document.getElementById('time').textContent = new Date().toLocaleString();
+        }
+        
+        updateTime();
+        setInterval(updateTime, 1000);
+    </script>
+</body>
+</html>

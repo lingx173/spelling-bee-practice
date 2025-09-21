@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CDN React Test</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+</head>
+<body>
+    <div id="root">
+        <p>Loading...</p>
+    </div>
+    
+    <script>
+        console.log('CDN test starting...');
+        console.log('React available:', typeof React !== 'undefined');
+        console.log('ReactDOM available:', typeof ReactDOM !== 'undefined');
+        
+        if (typeof React !== 'undefined' && typeof ReactDOM !== 'undefined') {
+            const { createRoot } = ReactDOM;
+            
+            function App() {
+                return React.createElement('div', { style: { padding: '20px' } },
+                    React.createElement('h1', null, 'CDN React Test'),
+                    React.createElement('p', null, 'If you see this, CDN React is working!'),
+                    React.createElement('p', null, 'Time: ' + new Date().toLocaleString())
+                );
+            }
+            
+            const root = createRoot(document.getElementById('root'));
+            root.render(React.createElement(App));
+            console.log('CDN React app rendered successfully!');
+        } else {
+            console.error('React or ReactDOM not available');
+            document.getElementById('root').innerHTML = '<p>React not available</p>';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>No Module Test</title>
+</head>
+<body>
+    <h1>No Module Test</h1>
+    <p>This page doesn't use ES modules.</p>
+    <p>If you see this, basic HTML is working.</p>
+    
+    <script>
+        console.log('No module test starting...');
+        
+        // Test if we can load external scripts
+        const script = document.createElement('script');
+        script.src = '/assets/index-ada77995.js';
+        script.type = 'module';
+        script.onload = function() {
+            console.log('Module script loaded successfully');
+        };
+        script.onerror = function(error) {
+            console.error('Module script failed to load:', error);
+        };
+        
+        document.head.appendChild(script);
+    </script>
+</body>
+</html>
