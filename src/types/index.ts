@@ -56,6 +56,7 @@ export interface PDFParseResult {
     filename: string
     pageCount: number
     extractedAt: string
+    note?: string
   }
 }
 
