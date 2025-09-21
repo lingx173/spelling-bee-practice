@@ -1,5 +1,4 @@
 import { PDFParseResult } from '../types'
-import { createWorker } from 'tesseract.js'
 import * as pdfjsLib from 'pdfjs-dist'
 
 // Configure PDF.js for rendering only (no worker for text extraction)
@@ -46,10 +45,15 @@ export class PDFParsingService {
         }
       }
 
-      // Try OCR for scanned PDFs
+      // Try OCR for scanned PDFs with timeout
       console.log('Attempting OCR for scanned PDF...')
       try {
-        const ocrWords = await this.performOCR(file)
+        const ocrPromise = this.performOCR(file)
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('OCR timeout')), 60000) // 60 second timeout
+        })
+        
+        const ocrWords = await Promise.race([ocrPromise, timeoutPromise])
         if (ocrWords.length > 0) {
           console.log('OCR successful, found', ocrWords.length, 'words')
           return {
@@ -126,6 +130,9 @@ export class PDFParsingService {
 
   private async performOCR(file: File): Promise<string[]> {
     console.log('Starting OCR processing for file:', file.name)
+    
+    // Dynamically import Tesseract.js to reduce initial bundle size
+    const { createWorker } = await import('tesseract.js')
     
     // Create a worker for OCR processing
     const worker = await createWorker('eng', 1, {
