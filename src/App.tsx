@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { useWords } from './hooks/useWords'
+import { ttsService } from './services/tts'
 
 function Home() {
   return (
@@ -57,9 +58,14 @@ function Practice() {
     autoAdvance: false,
     showHints: true,
     practiceOrder: 'random' as 'random' | 'sequential',
-    difficulty: 'all' as 'all' | 'easy' | 'medium' | 'hard'
+    difficulty: 'all' as 'all' | 'easy' | 'medium' | 'hard',
+    ttsEnabled: true,
+    ttsRate: 0.8,
+    ttsPitch: 1.0,
+    ttsVolume: 1.0
   })
   const [practiceWords, setPracticeWords] = useState<typeof words>([])
+  const [isSpeaking, setIsSpeaking] = useState(false)
 
   // Load settings from localStorage
   useEffect(() => {
@@ -67,6 +73,20 @@ function Practice() {
     if (savedSettings) {
       setSettings(JSON.parse(savedSettings))
     }
+  }, [])
+
+  // Initialize TTS service
+  useEffect(() => {
+    const initTTS = async () => {
+      try {
+        await ttsService.ensureReady()
+        console.log('TTS service initialized successfully')
+      } catch (error) {
+        console.warn('TTS service initialization failed:', error)
+      }
+    }
+    
+    initTTS()
   }, [])
 
   // Shuffle array function
@@ -150,6 +170,31 @@ function Practice() {
     setUserInput('')
     setShowResult(false)
     setScore({ correct: 0, total: 0 })
+    ttsService.stop()
+    setIsSpeaking(false)
+  }
+
+  const speakWord = async (word: string) => {
+    if (!settings.ttsEnabled) return
+    
+    if (isSpeaking) {
+      ttsService.stop()
+      setIsSpeaking(false)
+      return
+    }
+
+    try {
+      setIsSpeaking(true)
+      await ttsService.speak(word, { 
+        rate: settings.ttsRate,
+        pitch: settings.ttsPitch,
+        volume: settings.ttsVolume
+      })
+      setIsSpeaking(false)
+    } catch (error) {
+      console.error('TTS error:', error)
+      setIsSpeaking(false)
+    }
   }
 
   if (!isPracticeActive) {
@@ -255,8 +300,29 @@ function Practice() {
           {currentWord && (
             <div className="space-y-8">
               <div className="text-center">
-                <div className="text-6xl font-bold text-gray-900 mb-4">
-                  {currentWord.text.toUpperCase()}
+                <div className="flex items-center justify-center gap-4 mb-4">
+                  <div className="text-6xl font-bold text-gray-900">
+                    {currentWord.text.toUpperCase()}
+                  </div>
+                  <button
+                    onClick={() => speakWord(currentWord.text)}
+                    className={`p-3 rounded-full transition-colors ${
+                      isSpeaking 
+                        ? 'bg-red-100 text-red-600 hover:bg-red-200' 
+                        : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                    }`}
+                    title={isSpeaking ? 'Stop pronunciation' : 'Pronounce word'}
+                  >
+                    {isSpeaking ? (
+                      <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1zm4 0a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.793L4.617 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.617l3.766-3.793a1 1 0 011.617.793zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </button>
                 </div>
                 {settings.showHints && (
                   <div className={`inline-block px-3 py-1 text-sm rounded-full ${
@@ -603,7 +669,11 @@ function Settings() {
     autoAdvance: false,
     showHints: true,
     practiceOrder: 'random' as 'random' | 'sequential',
-    difficulty: 'all' as 'all' | 'easy' | 'medium' | 'hard'
+    difficulty: 'all' as 'all' | 'easy' | 'medium' | 'hard',
+    ttsEnabled: true,
+    ttsRate: 0.8,
+    ttsPitch: 1.0,
+    ttsVolume: 1.0
   })
 
   // Load settings from localStorage
@@ -761,6 +831,93 @@ function Settings() {
                     <option value="hard">Hard Only</option>
                   </select>
                 </div>
+              </div>
+            </div>
+
+            {/* Text-to-Speech Settings */}
+            <div className="bg-green-50 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">Text-to-Speech Settings</h2>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Enable TTS</label>
+                    <p className="text-xs text-gray-500">Enable audio pronunciation of words during practice</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={settings.ttsEnabled}
+                    onChange={(e) => updateSetting('ttsEnabled', e.target.checked)}
+                    className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                  />
+                </div>
+
+                {settings.ttsEnabled && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Speech Rate: {settings.ttsRate.toFixed(1)}x
+                      </label>
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="2.0"
+                        step="0.1"
+                        value={settings.ttsRate}
+                        onChange={(e) => updateSetting('ttsRate', parseFloat(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Pitch: {settings.ttsPitch.toFixed(1)}x
+                      </label>
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="2.0"
+                        step="0.1"
+                        value={settings.ttsPitch}
+                        onChange={(e) => updateSetting('ttsPitch', parseFloat(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Volume: {Math.round(settings.ttsVolume * 100)}%
+                      </label>
+                      <input
+                        type="range"
+                        min="0.1"
+                        max="1.0"
+                        step="0.1"
+                        value={settings.ttsVolume}
+                        onChange={(e) => updateSetting('ttsVolume', parseFloat(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="pt-2">
+                      <button
+                        onClick={async () => {
+                          try {
+                            await ttsService.speak('Hello, this is a test of the text-to-speech feature.', {
+                              rate: settings.ttsRate,
+                              pitch: settings.ttsPitch,
+                              volume: settings.ttsVolume
+                            })
+                          } catch (error) {
+                            console.error('TTS test failed:', error)
+                          }
+                        }}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        Test Voice
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 

@@ -1,4 +1,9 @@
-import { TTSOptions } from '../types'
+export interface TTSOptions {
+  rate?: number
+  pitch?: number
+  volume?: number
+  lang?: string
+}
 
 class TTSService {
   private synth: SpeechSynthesis | null = null
@@ -79,22 +84,22 @@ class TTSService {
 
     for (const priority of priorities) {
       const voice = this.voices.find(v => 
-        v.lang.includes(priority) || 
-        v.name.includes(priority)
+        v.lang.toLowerCase().includes(priority.toLowerCase()) || 
+        v.name.toLowerCase().includes(priority.toLowerCase())
       )
       if (voice) return voice
     }
 
     // Fallback to any English voice
-    return this.voices.find(v => 
-      v.lang.toLowerCase().startsWith('en')
-    ) || this.voices[0] || null
+    return this.voices.find(v => v.lang.toLowerCase().startsWith('en')) || null
   }
 
   public getAvailableVoices(): SpeechSynthesisVoice[] {
-    return this.voices.filter(voice => 
-      voice.lang.toLowerCase().startsWith('en')
-    )
+    return this.voices.filter(voice => voice.lang.toLowerCase().startsWith('en'))
+  }
+
+  public get currentVoice(): SpeechSynthesisVoice | null {
+    return this.preferredVoice || this.findBestEnglishVoice()
   }
 
   public setPreferredVoice(voiceName: string): void {
@@ -119,16 +124,16 @@ class TTSService {
       const utterance = new SpeechSynthesisUtterance(text)
       
       // Set voice
-      if (this.preferredVoice) {
-        utterance.voice = this.preferredVoice
-      }
+      utterance.voice = options.lang 
+        ? this.voices.find(v => v.lang === options.lang) || this.currentVoice
+        : this.currentVoice
       
       // Set options
-      utterance.rate = options.rate ?? 0.9
+      utterance.rate = options.rate ?? 0.8
       utterance.pitch = options.pitch ?? 1.0
       utterance.volume = options.volume ?? 1.0
-      utterance.lang = options.lang ?? 'en-US'
-      
+      utterance.lang = utterance.voice?.lang || 'en-US'
+
       // Event handlers
       utterance.onend = () => resolve()
       utterance.onerror = (event) => reject(new Error(`Speech synthesis error: ${event.error}`))
@@ -146,10 +151,6 @@ class TTSService {
 
   public get isAvailable(): boolean {
     return this.isSupported && this.voices.length > 0
-  }
-
-  public get currentVoice(): SpeechSynthesisVoice | null {
-    return this.preferredVoice
   }
 }
 
