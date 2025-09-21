@@ -71,8 +71,11 @@ function Practice() {
   // Load settings from localStorage
   useEffect(() => {
     const savedSettings = localStorage.getItem('spelling-bee-settings')
+    console.log('Practice component loading settings from localStorage:', savedSettings)
     if (savedSettings) {
-      setSettings(JSON.parse(savedSettings))
+      const parsedSettings = JSON.parse(savedSettings)
+      console.log('Practice component parsed settings:', parsedSettings)
+      setSettings(parsedSettings)
     }
   }, [])
 
@@ -427,7 +430,14 @@ function Upload() {
 
   const handlePDFUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file) return
+    console.log('PDF upload triggered, file:', file)
+    
+    if (!file) {
+      console.log('No file selected')
+      return
+    }
+
+    console.log('File type:', file.type, 'Size:', file.size)
 
     if (file.type !== 'application/pdf') {
       setMessage('Please select a PDF file')
@@ -436,9 +446,11 @@ function Upload() {
 
     setIsProcessing(true)
     setProcessingStep('Processing PDF...')
+    console.log('Starting PDF processing...')
     
     try {
       const result = await pdfParsingService.parseFile(file)
+      console.log('PDF processing result:', result)
       
       if (result.words.length > 0) {
         addWords(result.words, difficulty)
@@ -762,9 +774,11 @@ function Settings() {
 
   // Save settings to localStorage
   const updateSetting = (key: string, value: any) => {
+    console.log('Updating setting:', key, 'to:', value)
     const newSettings = { ...settings, [key]: value }
     setSettings(newSettings)
     localStorage.setItem('spelling-bee-settings', JSON.stringify(newSettings))
+    console.log('Settings updated:', newSettings)
   }
 
   const handleClearAllWords = () => {
