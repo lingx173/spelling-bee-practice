@@ -5,8 +5,12 @@ import './index.css'
 import { initializeSettings, seedSampleWords } from './lib/database.ts'
 
 // Initialize the database
-initializeSettings().catch(console.error)
-seedSampleWords().catch(console.error)
+initializeSettings().catch(error => {
+  console.warn('Failed to initialize settings:', error)
+})
+seedSampleWords().catch(error => {
+  console.warn('Failed to seed sample words:', error)
+})
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
