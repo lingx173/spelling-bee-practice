@@ -1,124 +1,17 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { Toaster } from 'react-hot-toast'
-import { useEffect, Component, ReactNode } from 'react'
-import { Home } from './components/pages/Home'
-import { Practice } from './components/pages/Practice'
-import { Upload } from './components/pages/Upload'
-import { WordList } from './components/pages/WordList'
-import { Settings } from './components/pages/Settings'
-import { Layout } from './components/layout/Layout'
-import { PWAUpdateNotification } from './components/ui/PWAUpdateNotification'
-import { ttsService } from './services/tts'
-
-// Add error boundary for individual components
-const SafeComponent = ({ children, name }: { children: ReactNode; name: string }) => {
-  try {
-    return <>{children}</>
-  } catch (error) {
-    console.error(`Error in ${name}:`, error)
-    return <div>Error loading {name}</div>
-  }
-}
-
-// Simple error boundary component
-class ErrorBoundary extends Component<
-  { children: ReactNode },
-  { hasError: boolean; error?: Error }
-> {
-  constructor(props: any) {
-    super(props)
-    this.state = { hasError: false }
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error }
-  }
-
-  componentDidCatch(error: Error, errorInfo: any) {
-    console.error('Error caught by boundary:', error, errorInfo)
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Something went wrong</h2>
-            <p className="text-gray-600 mb-4">Please refresh the page to try again.</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-            >
-              Refresh Page
-            </button>
-          </div>
-        </div>
-      )
-    }
-
-    return this.props.children
-  }
-}
-
-function App() {
-  // Debug logging
-  useEffect(() => {
-    console.log('App component mounted')
-    console.log('Current URL:', window.location.href)
-    console.log('Current pathname:', window.location.pathname)
-  }, [])
-
-  // Initialize TTS service when app loads
-  useEffect(() => {
-    const initTTS = async () => {
-      try {
-        await ttsService.ensureReady()
-        console.log('TTS service initialized successfully')
-      } catch (error) {
-        console.warn('TTS service initialization failed:', error)
-      }
-    }
-    
-    initTTS()
-  }, [])
+function SimpleApp() {
   return (
-    <ErrorBoundary>
-      <Router>
-        <div className="min-h-screen bg-gray-50">
-          <SafeComponent name="Layout">
-            <Layout>
-              <Routes>
-                <Route path="/" element={<SafeComponent name="Home"><Home /></SafeComponent>} />
-                <Route path="/practice" element={<SafeComponent name="Practice"><Practice /></SafeComponent>} />
-                <Route path="/upload" element={<SafeComponent name="Upload"><Upload /></SafeComponent>} />
-                <Route path="/words" element={<SafeComponent name="WordList"><WordList /></SafeComponent>} />
-                <Route path="/settings" element={<SafeComponent name="Settings"><Settings /></SafeComponent>} />
-              </Routes>
-            </Layout>
-          </SafeComponent>
-          
-          <SafeComponent name="Toaster">
-            <Toaster
-              position="top-center"
-              toastOptions={{
-                duration: 4000,
-                style: {
-                  background: '#363636',
-                  color: '#fff',
-                  fontSize: '16px',
-                  padding: '12px 16px',
-                },
-              }}
-            />
-          </SafeComponent>
-          
-          <SafeComponent name="PWAUpdateNotification">
-            <PWAUpdateNotification />
-          </SafeComponent>
-        </div>
-      </Router>
-    </ErrorBoundary>
+    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
+      <h1>Spelling Bee Practice</h1>
+      <p>Simple version - if you see this, the app is working!</p>
+      <p>Current time: {new Date().toLocaleString()}</p>
+      <div style={{ marginTop: '20px' }}>
+        <h2>Test Pages</h2>
+        <a href="/test.html" style={{ marginRight: '10px' }}>Test Page</a>
+        <a href="/static-test.html" style={{ marginRight: '10px' }}>Static Test</a>
+        <a href="/cdn-test.html">CDN React Test</a>
+      </div>
+    </div>
   )
 }
 
-export default App
+export default SimpleApp
