@@ -1251,15 +1251,32 @@ function App() {
     return () => clearTimeout(timer)
   }, [])
 
-  // Error boundary effect
+  // Error boundary effect - only catch unhandled errors
   useEffect(() => {
     const handleError = (error: ErrorEvent) => {
       console.error('App error caught:', error)
-      setHasError(true)
+      // Only show error screen for critical errors, not PDF processing errors
+      if (error.message && !error.message.includes('PDF') && !error.message.includes('OCR')) {
+        setHasError(true)
+      }
+    }
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('Unhandled promise rejection:', event.reason)
+      // Only show error screen for critical promise rejections
+      if (event.reason && typeof event.reason === 'string' && 
+          !event.reason.includes('PDF') && !event.reason.includes('OCR')) {
+        setHasError(true)
+      }
     }
 
     window.addEventListener('error', handleError)
-    return () => window.removeEventListener('error', handleError)
+    window.addEventListener('unhandledrejection', handleUnhandledRejection)
+    
+    return () => {
+      window.removeEventListener('error', handleError)
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection)
+    }
   }, [])
 
   if (hasError) {

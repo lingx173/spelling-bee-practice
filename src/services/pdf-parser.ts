@@ -1,7 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist'
 
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+// Configure PDF.js worker - disable worker to avoid CDN issues
+pdfjsLib.GlobalWorkerOptions.workerSrc = null as any
 
 export interface PDFParseResult {
   words: string[]
@@ -44,9 +44,12 @@ export class PDFParsingService {
               method: 'ocr'
             }
           }
+        } else {
+          console.log('OCR completed but found no words')
         }
       } catch (ocrError) {
         console.warn('OCR failed:', ocrError)
+        // Don't throw here, continue to fallback methods
       }
 
       // Fallback: Extract words from filename
@@ -106,19 +109,26 @@ export class PDFParsingService {
   private async performOCR(file: File): Promise<string[]> {
     console.log('Starting OCR processing for file:', file.name)
     
-    // Dynamically import Tesseract.js to reduce initial bundle size
-    const { createWorker } = await import('tesseract.js')
+    let worker: any = null
     
-    // Create a worker for OCR processing
-    const worker = await createWorker('eng', 1, {
-      logger: m => {
-        if (m.status === 'recognizing text') {
-          console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`)
-        }
-      }
-    })
-
     try {
+      // Dynamically import Tesseract.js to reduce initial bundle size
+      const { createWorker } = await import('tesseract.js')
+      
+      // Create a worker for OCR processing with timeout
+      worker = await Promise.race([
+        createWorker('eng', 1, {
+          logger: m => {
+            if (m.status === 'recognizing text') {
+              console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`)
+            }
+          }
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('OCR worker creation timeout')), 10000)
+        )
+      ]) as any
+
       // Convert PDF to image (first page only for now)
       const imageDataUrl = await this.convertPDFToImage(file)
       
@@ -126,9 +136,15 @@ export class PDFParsingService {
         throw new Error('Failed to convert PDF to image')
       }
 
-      // Perform OCR on the image
-      const { data: { text } } = await worker.recognize(imageDataUrl)
+      // Perform OCR on the image with timeout
+      const ocrResult = await Promise.race([
+        worker.recognize(imageDataUrl),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('OCR processing timeout')), 60000)
+        )
+      ]) as any
       
+      const text = ocrResult.data.text
       console.log('OCR extracted text length:', text.length)
       console.log('OCR extracted text sample:', text.substring(0, 1000))
       
@@ -140,9 +156,18 @@ export class PDFParsingService {
       console.log('Sample cleaned words:', cleanedWords.slice(0, 30))
       
       return cleanedWords
+    } catch (error) {
+      console.error('OCR processing failed:', error)
+      throw error
     } finally {
       // Clean up the worker
-      await worker.terminate()
+      if (worker) {
+        try {
+          await worker.terminate()
+        } catch (error) {
+          console.warn('Error terminating OCR worker:', error)
+        }
+      }
     }
   }
 
@@ -150,18 +175,23 @@ export class PDFParsingService {
     try {
       console.log('Converting PDF to image for OCR...')
       
-      // Load the PDF using PDF.js
+      // Load the PDF using PDF.js with timeout
       const arrayBuffer = await file.arrayBuffer()
-      const pdf = await pdfjsLib.getDocument({ 
-        data: arrayBuffer,
-        verbosity: 0,
-        useWorkerFetch: false,
-        isEvalSupported: false,
-        useSystemFonts: false,
-        disableFontFace: false,
-        disableAutoFetch: true,
-        disableStream: true
-      }).promise
+      const pdf = await Promise.race([
+        pdfjsLib.getDocument({ 
+          data: arrayBuffer,
+          verbosity: 0,
+          useWorkerFetch: false,
+          isEvalSupported: false,
+          useSystemFonts: false,
+          disableFontFace: false,
+          disableAutoFetch: true,
+          disableStream: true
+        }).promise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('PDF loading timeout')), 30000)
+        )
+      ]) as any
 
       console.log('PDF loaded, pages:', pdf.numPages)
 
@@ -172,19 +202,27 @@ export class PDFParsingService {
       // Create canvas
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d')
-      if (!ctx) return null
+      if (!ctx) {
+        console.error('Failed to get canvas context')
+        return null
+      }
 
       canvas.width = viewport.width
       canvas.height = viewport.height
 
-      // Render the page
+      // Render the page with timeout
       const renderContext = {
         canvasContext: ctx,
         viewport: viewport,
         canvas: canvas
       }
 
-      await page.render(renderContext).promise
+      await Promise.race([
+        page.render(renderContext).promise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('PDF rendering timeout')), 30000)
+        )
+      ])
       console.log('PDF page rendered to canvas')
 
       // Convert canvas to data URL
