@@ -39,27 +39,62 @@ export function useWords() {
   }, [words, loading])
 
   const addWord = (text: string, difficulty: 'easy' | 'medium' | 'hard' = 'medium') => {
+    const normalizedText = text.toLowerCase().trim()
+    
+    // Check if word already exists
+    const existingWord = words.find(word => word.text === normalizedText)
+    if (existingWord) {
+      console.log(`Word "${normalizedText}" already exists, skipping duplicate`)
+      return { success: false, message: `"${normalizedText}" already exists in your word list` }
+    }
+
     const newWord: Word = {
       id: Date.now().toString(),
-      text: text.toLowerCase().trim(),
+      text: normalizedText,
       difficulty,
       addedAt: new Date().toISOString(),
       correctCount: 0,
       incorrectCount: 0
     }
     setWords(prev => [...prev, newWord])
+    return { success: true, message: `"${normalizedText}" added successfully` }
   }
 
   const addWords = (wordList: string[], difficulty: 'easy' | 'medium' | 'hard' = 'medium') => {
-    const newWords: Word[] = wordList.map(text => ({
-      id: (Date.now() + Math.random()).toString(),
-      text: text.toLowerCase().trim(),
-      difficulty,
-      addedAt: new Date().toISOString(),
-      correctCount: 0,
-      incorrectCount: 0
-    }))
-    setWords(prev => [...prev, ...newWords])
+    const normalizedWords = wordList.map(text => text.toLowerCase().trim()).filter(text => text.length > 0)
+    const existingWords = new Set(words.map(word => word.text))
+    
+    const newWords: Word[] = []
+    const duplicates: string[] = []
+    
+    normalizedWords.forEach(text => {
+      if (existingWords.has(text)) {
+        duplicates.push(text)
+      } else {
+        newWords.push({
+          id: (Date.now() + Math.random()).toString(),
+          text,
+          difficulty,
+          addedAt: new Date().toISOString(),
+          correctCount: 0,
+          incorrectCount: 0
+        })
+      }
+    })
+    
+    if (newWords.length > 0) {
+      setWords(prev => [...prev, ...newWords])
+    }
+    
+    return {
+      success: newWords.length > 0,
+      addedCount: newWords.length,
+      duplicateCount: duplicates.length,
+      duplicates,
+      message: newWords.length > 0 
+        ? `Added ${newWords.length} new words${duplicates.length > 0 ? `, skipped ${duplicates.length} duplicates` : ''}`
+        : `All ${duplicates.length} words already exist in your word list`
+    }
   }
 
   const updateWord = (id: string, updates: Partial<Word>) => {

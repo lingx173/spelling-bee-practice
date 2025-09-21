@@ -412,14 +412,14 @@ function Upload() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingStep, setProcessingStep] = useState('')
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle')
-  const [uploadResult, setUploadResult] = useState<{wordsCount: number, filename: string} | null>(null)
+  const [uploadResult, setUploadResult] = useState<{wordsCount: number, filename: string, duplicates: number} | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleAddSingleWord = () => {
     if (newWord.trim()) {
-      addWord(newWord, difficulty)
+      const result = addWord(newWord, difficulty)
       setNewWord('')
-      setMessage(`Added "${newWord}" to your word list!`)
+      setMessage(result.message)
       setTimeout(() => setMessage(''), 3000)
     }
   }
@@ -432,10 +432,10 @@ function Upload() {
         .filter(word => word.length > 0)
       
       if (words.length > 0) {
-        addWords(words, difficulty)
+        const result = addWords(words, difficulty)
         setWordList('')
-        setMessage(`Added ${words.length} words to your word list!`)
-        setTimeout(() => setMessage(''), 3000)
+        setMessage(result.message)
+        setTimeout(() => setMessage(''), 5000) // Longer timeout for more detailed messages
       }
     }
   }
@@ -473,17 +473,21 @@ function Upload() {
       console.log('PDF processing result:', result)
       
       if (result.words.length > 0) {
-        addWords(result.words, difficulty)
+        const addResult = addWords(result.words, difficulty)
         setUploadStatus('success')
-        setUploadResult({ wordsCount: result.words.length, filename: file.name })
-        setMessage(`Successfully imported ${result.words.length} words from "${file.name}"!`)
+        setUploadResult({ 
+          wordsCount: addResult.addedCount, 
+          filename: file.name,
+          duplicates: addResult.duplicateCount
+        })
+        setMessage(addResult.message)
         
-        // Auto-reset after 5 seconds
+        // Auto-reset after 7 seconds for more detailed messages
         setTimeout(() => {
           setUploadStatus('idle')
           setUploadResult(null)
           setMessage('')
-        }, 5000)
+        }, 7000)
       } else {
         setUploadStatus('error')
         setMessage('No words found in the PDF')
@@ -635,7 +639,12 @@ function Upload() {
                     <div>
                       <p className="font-medium text-green-800">Upload Successful!</p>
                       <p className="text-sm text-green-600">
-                        Imported {uploadResult.wordsCount} words from "{uploadResult.filename}"
+                        Added {uploadResult.wordsCount} new words from "{uploadResult.filename}"
+                        {uploadResult.duplicates > 0 && (
+                          <span className="block text-orange-600">
+                            ({uploadResult.duplicates} duplicates skipped)
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -738,9 +747,9 @@ function Upload() {
                     'generous', 'hospital', 'important', 'journey', 'knowledge',
                     'language', 'mountain', 'necessary', 'opportunity', 'perfect'
                   ]
-                  addWords(sampleWords, 'medium')
-                  setMessage(`Added ${sampleWords.length} sample words!`)
-                  setTimeout(() => setMessage(''), 3000)
+                  const result = addWords(sampleWords, 'medium')
+                  setMessage(result.message)
+                  setTimeout(() => setMessage(''), 5000)
                 }}
                 className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
               >
