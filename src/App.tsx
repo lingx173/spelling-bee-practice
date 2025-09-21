@@ -75,7 +75,17 @@ function Practice() {
     if (savedSettings) {
       const parsedSettings = JSON.parse(savedSettings)
       console.log('Practice component parsed settings:', parsedSettings)
-      setSettings(parsedSettings)
+      // Ensure all settings have default values
+      setSettings({
+        autoAdvance: parsedSettings.autoAdvance ?? false,
+        showHints: parsedSettings.showHints ?? true,
+        practiceOrder: parsedSettings.practiceOrder ?? 'random',
+        difficulty: parsedSettings.difficulty ?? 'all',
+        ttsEnabled: parsedSettings.ttsEnabled ?? true,
+        ttsRate: parsedSettings.ttsRate ?? 0.8,
+        ttsPitch: parsedSettings.ttsPitch ?? 1.0,
+        ttsVolume: parsedSettings.ttsVolume ?? 1.0
+      })
     }
   }, [])
 
@@ -580,7 +590,21 @@ function Upload() {
                     onChange={handlePDFUpload}
                     disabled={isProcessing}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:opacity-50"
+                    style={{ display: 'block' }}
                   />
+                  <div className="mt-2 text-xs text-gray-500">
+                    <p>Debug: File input should trigger onChange when PDF is selected</p>
+                    <button
+                      onClick={() => {
+                        console.log('Test button clicked')
+                        setMessage('Test: This should work if the component is functioning')
+                        setTimeout(() => setMessage(''), 3000)
+                      }}
+                      className="mt-2 px-3 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700"
+                    >
+                      Test Button
+                    </button>
+                  </div>
                 </div>
                 <div className="text-xs text-gray-500">
                   <p>• Maximum file size: 10MB</p>
@@ -768,7 +792,18 @@ function Settings() {
   useEffect(() => {
     const savedSettings = localStorage.getItem('spelling-bee-settings')
     if (savedSettings) {
-      setSettings(JSON.parse(savedSettings))
+      const parsedSettings = JSON.parse(savedSettings)
+      // Ensure all settings have default values
+      setSettings({
+        autoAdvance: parsedSettings.autoAdvance ?? false,
+        showHints: parsedSettings.showHints ?? true,
+        practiceOrder: parsedSettings.practiceOrder ?? 'random',
+        difficulty: parsedSettings.difficulty ?? 'all',
+        ttsEnabled: parsedSettings.ttsEnabled ?? true,
+        ttsRate: parsedSettings.ttsRate ?? 0.8,
+        ttsPitch: parsedSettings.ttsPitch ?? 1.0,
+        ttsVolume: parsedSettings.ttsVolume ?? 1.0
+      })
     }
   }, [])
 
