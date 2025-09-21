@@ -10,22 +10,17 @@ import { Layout } from './components/layout/Layout'
 import { PWAUpdateNotification } from './components/ui/PWAUpdateNotification'
 import { ttsService } from './services/tts'
 
-// Error boundary component
-interface ErrorBoundaryState {
-  hasError: boolean
-  error?: Error
-}
-
+// Simple error boundary component
 class ErrorBoundary extends Component<
-  { children: ReactNode; fallback?: (error: Error, resetError: () => void) => ReactNode },
-  ErrorBoundaryState
+  { children: ReactNode },
+  { hasError: boolean; error?: Error }
 > {
   constructor(props: any) {
     super(props)
     this.state = { hasError: false }
   }
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  static getDerivedStateFromError(error: Error) {
     return { hasError: true, error }
   }
 
@@ -34,19 +29,17 @@ class ErrorBoundary extends Component<
   }
 
   render() {
-    if (this.state.hasError && this.state.error) {
-      return this.props.fallback ? (
-        this.props.fallback(this.state.error, () => this.setState({ hasError: false, error: undefined }))
-      ) : (
+    if (this.state.hasError) {
+      return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Something went wrong</h2>
-            <p className="text-gray-600 mb-4">{this.state.error.message}</p>
+            <p className="text-gray-600 mb-4">Please refresh the page to try again.</p>
             <button
-              onClick={() => this.setState({ hasError: false, error: undefined })}
-              className="bg-primary-600 text-white px-4 py-2 rounded hover:bg-primary-700"
+              onClick={() => window.location.reload()}
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
             >
-              Try again
+              Refresh Page
             </button>
           </div>
         </div>
