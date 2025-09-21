@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useWords } from './hooks/useWords'
 
 function Home() {
@@ -45,18 +45,227 @@ function Home() {
 }
 
 function Practice() {
+  const { words, updateWord } = useWords()
+  const [currentWordIndex, setCurrentWordIndex] = useState(0)
+  const [userInput, setUserInput] = useState('')
+  const [showResult, setShowResult] = useState(false)
+  const [isCorrect, setIsCorrect] = useState(false)
+  const [practiceMode, setPracticeMode] = useState<'all' | 'easy' | 'medium' | 'hard'>('all')
+  const [score, setScore] = useState({ correct: 0, total: 0 })
+  const [isPracticeActive, setIsPracticeActive] = useState(false)
+
+  const filteredWords = practiceMode === 'all' 
+    ? words 
+    : words.filter(word => word.difficulty === practiceMode)
+
+  const currentWord = filteredWords[currentWordIndex]
+
+  const startPractice = () => {
+    if (filteredWords.length === 0) {
+      alert('No words available for practice! Please add some words first.')
+      return
+    }
+    setCurrentWordIndex(0)
+    setScore({ correct: 0, total: 0 })
+    setIsPracticeActive(true)
+    setShowResult(false)
+    setUserInput('')
+  }
+
+  const checkAnswer = () => {
+    if (!currentWord) return
+
+    const correct = userInput.toLowerCase().trim() === currentWord.text.toLowerCase()
+    setIsCorrect(correct)
+    setShowResult(true)
+
+    // Update word statistics
+    updateWord(currentWord.id, {
+      correctCount: currentWord.correctCount + (correct ? 1 : 0),
+      incorrectCount: currentWord.incorrectCount + (correct ? 0 : 1)
+    })
+
+    // Update score
+    setScore(prev => ({
+      correct: prev.correct + (correct ? 1 : 0),
+      total: prev.total + 1
+    }))
+  }
+
+  const nextWord = () => {
+    if (currentWordIndex < filteredWords.length - 1) {
+      setCurrentWordIndex(prev => prev + 1)
+      setUserInput('')
+      setShowResult(false)
+    } else {
+      // Practice completed
+      setIsPracticeActive(false)
+      setCurrentWordIndex(0)
+    }
+  }
+
+  const resetPractice = () => {
+    setIsPracticeActive(false)
+    setCurrentWordIndex(0)
+    setUserInput('')
+    setShowResult(false)
+    setScore({ correct: 0, total: 0 })
+  }
+
+  if (!isPracticeActive) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h1 className="text-3xl font-bold text-gray-900">Practice Mode</h1>
+              <Link 
+                to="/" 
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                ← Back to Home
+              </Link>
+            </div>
+
+            {filteredWords.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-lg text-gray-600 mb-4">No words available for practice!</p>
+                <Link 
+                  to="/upload" 
+                  className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Add Some Words
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="bg-gray-50 rounded-lg p-6">
+                  <h2 className="text-xl font-semibold text-gray-800 mb-4">Practice Settings</h2>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Practice Mode
+                      </label>
+                      <select
+                        value={practiceMode}
+                        onChange={(e) => setPracticeMode(e.target.value as 'all' | 'easy' | 'medium' | 'hard')}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="all">All Words ({words.length})</option>
+                        <option value="easy">Easy Words ({words.filter(w => w.difficulty === 'easy').length})</option>
+                        <option value="medium">Medium Words ({words.filter(w => w.difficulty === 'medium').length})</option>
+                        <option value="hard">Hard Words ({words.filter(w => w.difficulty === 'hard').length})</option>
+                      </select>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      <p>Words to practice: <span className="font-semibold">{filteredWords.length}</span></p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-center">
+                  <button
+                    onClick={startPractice}
+                    className="px-8 py-4 bg-green-600 text-white text-lg font-semibold rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    Start Practice
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Practice Mode</h1>
-          <p className="text-lg text-gray-600 mb-6">Practice your spelling words here!</p>
-          <Link 
-            to="/" 
-            className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-          >
-            ← Back to Home
-          </Link>
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-3xl font-bold text-gray-900">Practice Mode</h1>
+            <div className="flex gap-2">
+              <button
+                onClick={resetPractice}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                End Practice
+              </button>
+              <Link 
+                to="/" 
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                ← Back to Home
+              </Link>
+            </div>
+          </div>
+
+          <div className="text-center mb-8">
+            <div className="text-lg text-gray-600 mb-2">
+              Word {currentWordIndex + 1} of {filteredWords.length}
+            </div>
+            <div className="text-sm text-gray-500">
+              Score: {score.correct}/{score.total} ({score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0}%)
+            </div>
+          </div>
+
+          {currentWord && (
+            <div className="space-y-8">
+              <div className="text-center">
+                <div className="text-6xl font-bold text-gray-900 mb-4">
+                  {currentWord.text.toUpperCase()}
+                </div>
+                <div className={`inline-block px-3 py-1 text-sm rounded-full ${
+                  currentWord.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
+                  currentWord.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-red-100 text-red-800'
+                }`}>
+                  {currentWord.difficulty}
+                </div>
+              </div>
+
+              <div className="max-w-md mx-auto">
+                <input
+                  type="text"
+                  value={userInput}
+                  onChange={(e) => setUserInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && !showResult && checkAnswer()}
+                  placeholder="Type the word here..."
+                  className="w-full px-4 py-3 text-lg border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center"
+                  disabled={showResult}
+                />
+              </div>
+
+              {!showResult ? (
+                <div className="text-center">
+                  <button
+                    onClick={checkAnswer}
+                    className="px-8 py-3 bg-blue-600 text-white text-lg font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Check Answer
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center space-y-4">
+                  <div className={`text-2xl font-bold ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                    {isCorrect ? '✓ Correct!' : '✗ Incorrect'}
+                  </div>
+                  {!isCorrect && (
+                    <div className="text-lg text-gray-600">
+                      Correct spelling: <span className="font-semibold">{currentWord.text}</span>
+                    </div>
+                  )}
+                  <button
+                    onClick={nextWord}
+                    className="px-8 py-3 bg-green-600 text-white text-lg font-semibold rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    {currentWordIndex < filteredWords.length - 1 ? 'Next Word' : 'Finish Practice'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -337,18 +546,218 @@ function WordList() {
 }
 
 function Settings() {
+  const { words, clearAllWords } = useWords()
+  const [showConfirmClear, setShowConfirmClear] = useState(false)
+  const [settings, setSettings] = useState({
+    autoAdvance: false,
+    showHints: true,
+    practiceOrder: 'random' as 'random' | 'sequential',
+    difficulty: 'all' as 'all' | 'easy' | 'medium' | 'hard'
+  })
+
+  // Load settings from localStorage
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('spelling-bee-settings')
+    if (savedSettings) {
+      setSettings(JSON.parse(savedSettings))
+    }
+  }, [])
+
+  // Save settings to localStorage
+  const updateSetting = (key: string, value: any) => {
+    const newSettings = { ...settings, [key]: value }
+    setSettings(newSettings)
+    localStorage.setItem('spelling-bee-settings', JSON.stringify(newSettings))
+  }
+
+  const handleClearAllWords = () => {
+    clearAllWords()
+    setShowConfirmClear(false)
+  }
+
+  const getStats = () => {
+    const totalWords = words.length
+    const easyWords = words.filter(w => w.difficulty === 'easy').length
+    const mediumWords = words.filter(w => w.difficulty === 'medium').length
+    const hardWords = words.filter(w => w.difficulty === 'hard').length
+    const totalCorrect = words.reduce((sum, word) => sum + word.correctCount, 0)
+    const totalIncorrect = words.reduce((sum, word) => sum + word.incorrectCount, 0)
+    const totalAttempts = totalCorrect + totalIncorrect
+    const accuracy = totalAttempts > 0 ? Math.round((totalCorrect / totalAttempts) * 100) : 0
+
+    return {
+      totalWords,
+      easyWords,
+      mediumWords,
+      hardWords,
+      totalCorrect,
+      totalIncorrect,
+      totalAttempts,
+      accuracy
+    }
+  }
+
+  const stats = getStats()
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Settings</h1>
-          <p className="text-lg text-gray-600 mb-6">Configure your settings here!</p>
-          <Link 
-            to="/" 
-            className="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-          >
-            ← Back to Home
-          </Link>
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+            <Link 
+              to="/" 
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              ← Back to Home
+            </Link>
+          </div>
+
+          <div className="space-y-8">
+            {/* Statistics */}
+            <div className="bg-blue-50 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">Statistics</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{stats.totalWords}</div>
+                  <div className="text-sm text-gray-600">Total Words</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">{stats.easyWords}</div>
+                  <div className="text-sm text-gray-600">Easy</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-yellow-600">{stats.mediumWords}</div>
+                  <div className="text-sm text-gray-600">Medium</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-red-600">{stats.hardWords}</div>
+                  <div className="text-sm text-gray-600">Hard</div>
+                </div>
+              </div>
+              {stats.totalAttempts > 0 && (
+                <div className="mt-4 pt-4 border-t border-blue-200">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-center">
+                    <div>
+                      <div className="text-lg font-bold text-gray-800">{stats.totalCorrect}</div>
+                      <div className="text-sm text-gray-600">Correct</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-gray-800">{stats.totalIncorrect}</div>
+                      <div className="text-sm text-gray-600">Incorrect</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-gray-800">{stats.accuracy}%</div>
+                      <div className="text-sm text-gray-600">Accuracy</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Practice Settings */}
+            <div className="bg-gray-50 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">Practice Settings</h2>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Auto Advance</label>
+                    <p className="text-xs text-gray-500">Automatically move to next word after answering</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={settings.autoAdvance}
+                    onChange={(e) => updateSetting('autoAdvance', e.target.checked)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Show Hints</label>
+                    <p className="text-xs text-gray-500">Show difficulty level and progress during practice</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={settings.showHints}
+                    onChange={(e) => updateSetting('showHints', e.target.checked)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Practice Order</label>
+                  <select
+                    value={settings.practiceOrder}
+                    onChange={(e) => updateSetting('practiceOrder', e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="random">Random Order</option>
+                    <option value="sequential">Sequential Order</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Default Difficulty Filter</label>
+                  <select
+                    value={settings.difficulty}
+                    onChange={(e) => updateSetting('difficulty', e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="all">All Words</option>
+                    <option value="easy">Easy Only</option>
+                    <option value="medium">Medium Only</option>
+                    <option value="hard">Hard Only</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Data Management */}
+            <div className="bg-red-50 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">Data Management</h2>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Clear All Words</label>
+                    <p className="text-xs text-gray-500">Permanently delete all {stats.totalWords} words and statistics</p>
+                  </div>
+                  <button
+                    onClick={() => setShowConfirmClear(true)}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {showConfirmClear && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 max-w-md mx-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Clear All Data?</h3>
+                <p className="text-gray-600 mb-6">
+                  This will permanently delete all {stats.totalWords} words and all practice statistics. 
+                  This action cannot be undone.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleClearAllWords}
+                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                  >
+                    Yes, Clear All
+                  </button>
+                  <button
+                    onClick={() => setShowConfirmClear(false)}
+                    className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
