@@ -1,7 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist'
 
-// Configure PDF.js worker - disable worker to avoid CDN issues
-pdfjsLib.GlobalWorkerOptions.workerSrc = null as any
+// Configure PDF.js worker - use a reliable CDN
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`
 
 export interface PDFParseResult {
   words: string[]
@@ -137,13 +137,7 @@ export class PDFParsingService {
       const arrayBuffer = await file.arrayBuffer()
       const pdf = await pdfjsLib.getDocument({ 
         data: arrayBuffer,
-        verbosity: 0,
-        useWorkerFetch: false,
-        isEvalSupported: false,
-        useSystemFonts: false,
-        disableFontFace: false,
-        disableAutoFetch: true,
-        disableStream: true
+        verbosity: 0
       }).promise
 
       console.log('PDF loaded, pages:', pdf.numPages)
@@ -152,11 +146,19 @@ export class PDFParsingService {
       
       // Extract text from all pages
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        console.log(`Processing page ${pageNum} of ${pdf.numPages}`)
         const page = await pdf.getPage(pageNum)
         const textContent = await page.getTextContent()
+        
+        console.log(`Page ${pageNum} text items:`, textContent.items.length)
+        
         const pageText = textContent.items
           .map((item: any) => item.str)
           .join(' ')
+        
+        console.log(`Page ${pageNum} text length:`, pageText.length)
+        console.log(`Page ${pageNum} text sample:`, pageText.substring(0, 200))
+        
         allText += pageText + ' '
       }
 
@@ -170,9 +172,68 @@ export class PDFParsingService {
       console.log('Text extraction found', cleanedWords.length, 'unique words')
       console.log('Sample cleaned words:', cleanedWords.slice(0, 30))
       
+      // If no words found, try alternative text extraction
+      if (cleanedWords.length === 0) {
+        console.log('No words found with standard extraction, trying alternative method...')
+        return await this.extractTextAlternative(file)
+      }
+      
       return cleanedWords
     } catch (error) {
       console.error('Text extraction failed:', error)
+      // Try alternative method as fallback
+      console.log('Trying alternative text extraction...')
+      return await this.extractTextAlternative(file)
+    }
+  }
+
+  private async extractTextAlternative(file: File): Promise<string[]> {
+    try {
+      console.log('Trying alternative text extraction method...')
+      
+      // Load the PDF using PDF.js with different settings
+      const arrayBuffer = await file.arrayBuffer()
+      const pdf = await pdfjsLib.getDocument({ 
+        data: arrayBuffer,
+        verbosity: 0,
+        useWorkerFetch: false,
+        isEvalSupported: false
+      }).promise
+
+      console.log('Alternative PDF loaded, pages:', pdf.numPages)
+
+      let allText = ''
+      
+      // Try to extract text using renderTextContent method
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        console.log(`Alternative processing page ${pageNum}`)
+        const page = await pdf.getPage(pageNum)
+        
+        // Try different text extraction methods
+        try {
+          const textContent = await page.getTextContent()
+          const pageText = textContent.items
+            .map((item: any) => item.str)
+            .join(' ')
+          allText += pageText + ' '
+          console.log(`Alternative page ${pageNum} text:`, pageText.substring(0, 100))
+        } catch (pageError) {
+          console.warn(`Failed to extract text from page ${pageNum}:`, pageError)
+        }
+      }
+
+      console.log('Alternative extracted text length:', allText.length)
+      
+      if (allText.trim().length > 0) {
+        const words = this.extractWordsFromText(allText)
+        const cleanedWords = this.cleanAndDeduplicateWords(words)
+        console.log('Alternative method found', cleanedWords.length, 'words')
+        return cleanedWords
+      }
+      
+      return []
+    } catch (error) {
+      console.error('Alternative text extraction failed:', error)
       return []
     }
   }
