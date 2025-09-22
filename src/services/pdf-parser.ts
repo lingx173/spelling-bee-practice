@@ -1,15 +1,9 @@
 import * as pdfjsLib from 'pdfjs-dist'
 
-// Configure PDF.js worker - try multiple approaches
-try {
-  // First try CDN
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`
-  console.log('PDF.js worker configured with CDN')
-} catch (error) {
-  console.warn('CDN worker failed, trying local fallback')
-  // Fallback to local worker or disable worker
-  pdfjsLib.GlobalWorkerOptions.workerSrc = null as any
-}
+// Configure PDF.js worker - disable worker completely for now
+console.log('Configuring PDF.js worker...')
+pdfjsLib.GlobalWorkerOptions.workerSrc = null as any
+console.log('PDF.js worker disabled - using main thread')
 
 export interface PDFParseResult {
   words: string[]
@@ -150,21 +144,37 @@ export class PDFParsingService {
       console.log('File size:', file.size)
       console.log('File type:', file.type)
       
+      // Test PDF.js availability first
+      console.log('PDF.js version:', pdfjsLib.version)
+      console.log('PDF.js GlobalWorkerOptions:', pdfjsLib.GlobalWorkerOptions)
+      
       // Load the PDF using PDF.js with timeout
       const arrayBuffer = await file.arrayBuffer()
       console.log('PDF array buffer size:', arrayBuffer.byteLength)
       
       // Try to load PDF with minimal configuration
       console.log('Attempting to load PDF with PDF.js...')
-      const pdf = await pdfjsLib.getDocument({ 
+      
+      const loadingTask = pdfjsLib.getDocument({ 
         data: arrayBuffer,
         verbosity: 0,
         useWorkerFetch: false,
-        isEvalSupported: false
-      }).promise
-
+        isEvalSupported: false,
+        useSystemFonts: false,
+        disableFontFace: false,
+        disableAutoFetch: true,
+        disableStream: true
+      })
+      
+      console.log('PDF loading task created, waiting for promise...')
+      const pdf = await loadingTask.promise
       console.log('✅ PDF loaded successfully!')
       console.log('Number of pages:', pdf.numPages)
+
+      if (pdf.numPages === 0) {
+        console.log('❌ PDF has no pages!')
+        return []
+      }
 
       let allText = ''
       
@@ -176,6 +186,11 @@ export class PDFParsingService {
         
         const textContent = await page.getTextContent()
         console.log(`Page ${pageNum} has ${textContent.items.length} text items`)
+        
+        if (textContent.items.length === 0) {
+          console.log(`❌ Page ${pageNum} has no text items!`)
+          continue
+        }
         
         // Log each text item for debugging
         textContent.items.forEach((item: any, index: number) => {
