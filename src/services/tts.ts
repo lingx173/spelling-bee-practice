@@ -129,10 +129,10 @@ class TTSService {
         : this.currentVoice
       
       // Set options
-      utterance.rate = options.rate ?? 0.8
+      utterance.rate = options.rate ?? 0.9
       utterance.pitch = options.pitch ?? 1.0
       utterance.volume = options.volume ?? 1.0
-      utterance.lang = utterance.voice?.lang || 'en-US'
+      utterance.lang = utterance.voice?.lang || 'en-US' // Ensure lang is set
 
       // Event handlers
       utterance.onend = () => resolve()
