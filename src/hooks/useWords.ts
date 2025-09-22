@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { v4 as uuidv4 } from 'uuid'
 
 export interface Word {
   id: string
@@ -9,16 +10,15 @@ export interface Word {
   incorrectCount: number
 }
 
-export function useWords() {
+export const useWords = () => {
   const [words, setWords] = useState<Word[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Load words from localStorage on mount
   useEffect(() => {
     try {
-      const savedWords = localStorage.getItem('spelling-bee-words')
-      if (savedWords) {
-        setWords(JSON.parse(savedWords))
+      const storedWords = localStorage.getItem('spelling-bee-words')
+      if (storedWords) {
+        setWords(JSON.parse(storedWords))
       }
     } catch (error) {
       console.error('Failed to load words from localStorage:', error)
@@ -27,7 +27,6 @@ export function useWords() {
     }
   }, [])
 
-  // Save words to localStorage whenever words change
   useEffect(() => {
     if (!loading) {
       try {
@@ -49,7 +48,7 @@ export function useWords() {
     }
 
     const newWord: Word = {
-      id: Date.now().toString(),
+      id: uuidv4(),
       text: normalizedText,
       difficulty,
       addedAt: new Date().toISOString(),
@@ -72,7 +71,7 @@ export function useWords() {
         duplicates.push(text)
       } else {
         newWords.push({
-          id: (Date.now() + Math.random()).toString(),
+          id: uuidv4(),
           text,
           difficulty,
           addedAt: new Date().toISOString(),
