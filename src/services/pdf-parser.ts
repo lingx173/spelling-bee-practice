@@ -28,7 +28,30 @@ export class PDFParsingService {
 
       console.log('Starting PDF parsing for file:', file.name, 'Size:', file.size)
 
-      // Try OCR for scanned PDFs
+      // Try text extraction first for regular PDFs
+      try {
+        console.log('Attempting text extraction from PDF...')
+        const textWords = await this.extractTextFromPDF(file)
+        if (textWords.length > 0) {
+          console.log('Text extraction successful, found', textWords.length, 'words')
+          return {
+            words: textWords,
+            metadata: {
+              filename: file.name,
+              pageCount: 1,
+              extractedAt: new Date().toISOString(),
+              note: 'Words extracted from PDF text content',
+              method: 'text-extraction'
+            }
+          }
+        } else {
+          console.log('Text extraction found no words, trying OCR...')
+        }
+      } catch (textError) {
+        console.warn('Text extraction failed:', textError)
+      }
+
+      // Try OCR for scanned PDFs only if text extraction failed
       try {
         console.log('Attempting OCR for scanned PDF...')
         const ocrWords = await this.performOCR(file)
@@ -103,6 +126,54 @@ export class PDFParsingService {
       } else {
         throw new Error('Failed to parse PDF: Unknown error occurred')
       }
+    }
+  }
+
+  private async extractTextFromPDF(file: File): Promise<string[]> {
+    try {
+      console.log('Extracting text from PDF...')
+      
+      // Load the PDF using PDF.js
+      const arrayBuffer = await file.arrayBuffer()
+      const pdf = await pdfjsLib.getDocument({ 
+        data: arrayBuffer,
+        verbosity: 0,
+        useWorkerFetch: false,
+        isEvalSupported: false,
+        useSystemFonts: false,
+        disableFontFace: false,
+        disableAutoFetch: true,
+        disableStream: true
+      }).promise
+
+      console.log('PDF loaded, pages:', pdf.numPages)
+
+      let allText = ''
+      
+      // Extract text from all pages
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum)
+        const textContent = await page.getTextContent()
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(' ')
+        allText += pageText + ' '
+      }
+
+      console.log('Extracted text length:', allText.length)
+      console.log('Extracted text sample:', allText.substring(0, 500))
+
+      // Extract and clean words from text
+      const words = this.extractWordsFromText(allText)
+      const cleanedWords = this.cleanAndDeduplicateWords(words)
+      
+      console.log('Text extraction found', cleanedWords.length, 'unique words')
+      console.log('Sample cleaned words:', cleanedWords.slice(0, 30))
+      
+      return cleanedWords
+    } catch (error) {
+      console.error('Text extraction failed:', error)
+      return []
     }
   }
 
