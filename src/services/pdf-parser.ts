@@ -1,7 +1,15 @@
 import * as pdfjsLib from 'pdfjs-dist'
 
-// Configure PDF.js worker - use a reliable CDN
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`
+// Configure PDF.js worker - try multiple approaches
+try {
+  // First try CDN
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`
+  console.log('PDF.js worker configured with CDN')
+} catch (error) {
+  console.warn('CDN worker failed, trying local fallback')
+  // Fallback to local worker or disable worker
+  pdfjsLib.GlobalWorkerOptions.workerSrc = null as any
+}
 
 export interface PDFParseResult {
   words: string[]
@@ -32,8 +40,10 @@ export class PDFParsingService {
       try {
         console.log('Attempting text extraction from PDF...')
         const textWords = await this.extractTextFromPDF(file)
+        console.log('Text extraction result:', textWords.length, 'words found')
         if (textWords.length > 0) {
           console.log('Text extraction successful, found', textWords.length, 'words')
+          console.log('Sample words:', textWords.slice(0, 10))
           return {
             words: textWords,
             metadata: {
@@ -48,7 +58,11 @@ export class PDFParsingService {
           console.log('Text extraction found no words, trying OCR...')
         }
       } catch (textError) {
-        console.warn('Text extraction failed:', textError)
+        console.error('Text extraction failed with error:', textError)
+        if (textError instanceof Error) {
+          console.error('Error details:', textError.message)
+          console.error('Error stack:', textError.stack)
+        }
       }
 
       // Try OCR for scanned PDFs only if text extraction failed
@@ -133,12 +147,19 @@ export class PDFParsingService {
     try {
       console.log('Extracting text from PDF...')
       
-      // Load the PDF using PDF.js
+      // Load the PDF using PDF.js with timeout
       const arrayBuffer = await file.arrayBuffer()
-      const pdf = await pdfjsLib.getDocument({ 
-        data: arrayBuffer,
-        verbosity: 0
-      }).promise
+      console.log('PDF array buffer size:', arrayBuffer.byteLength)
+      
+      const pdf = await Promise.race([
+        pdfjsLib.getDocument({ 
+          data: arrayBuffer,
+          verbosity: 0
+        }).promise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('PDF loading timeout')), 15000)
+        )
+      ]) as any
 
       console.log('PDF loaded, pages:', pdf.numPages)
 
@@ -175,7 +196,14 @@ export class PDFParsingService {
       // If no words found, try alternative text extraction
       if (cleanedWords.length === 0) {
         console.log('No words found with standard extraction, trying alternative method...')
-        return await this.extractTextAlternative(file)
+        const altWords = await this.extractTextAlternative(file)
+        if (altWords.length > 0) {
+          return altWords
+        }
+        
+        // If still no words, try a very basic text extraction
+        console.log('Trying basic text extraction...')
+        return await this.extractTextBasic(file)
       }
       
       return cleanedWords
@@ -234,6 +262,65 @@ export class PDFParsingService {
       return []
     } catch (error) {
       console.error('Alternative text extraction failed:', error)
+      return []
+    }
+  }
+
+  private async extractTextBasic(file: File): Promise<string[]> {
+    try {
+      console.log('Trying basic text extraction...')
+      
+      // Load the PDF using PDF.js with minimal settings
+      const arrayBuffer = await file.arrayBuffer()
+      const pdf = await pdfjsLib.getDocument({ 
+        data: arrayBuffer,
+        verbosity: 0,
+        useWorkerFetch: false,
+        isEvalSupported: false,
+        useSystemFonts: false,
+        disableFontFace: false,
+        disableAutoFetch: true,
+        disableStream: true
+      }).promise
+
+      console.log('Basic PDF loaded, pages:', pdf.numPages)
+
+      let allText = ''
+      
+      // Extract text from all pages using basic method
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        console.log(`Basic processing page ${pageNum}`)
+        const page = await pdf.getPage(pageNum)
+        
+        // Try to get text content
+        const textContent = await page.getTextContent()
+        console.log(`Page ${pageNum} has ${textContent.items.length} text items`)
+        
+        // Extract text from items
+        const pageText = textContent.items
+          .map((item: any) => {
+            console.log('Text item:', item.str, 'transform:', item.transform)
+            return item.str
+          })
+          .join(' ')
+        
+        console.log(`Page ${pageNum} extracted text:`, pageText)
+        allText += pageText + ' '
+      }
+
+      console.log('Basic extracted text length:', allText.length)
+      console.log('Basic extracted text:', allText)
+      
+      if (allText.trim().length > 0) {
+        const words = this.extractWordsFromText(allText)
+        const cleanedWords = this.cleanAndDeduplicateWords(words)
+        console.log('Basic method found', cleanedWords.length, 'words')
+        return cleanedWords
+      }
+      
+      return []
+    } catch (error) {
+      console.error('Basic text extraction failed:', error)
       return []
     }
   }
