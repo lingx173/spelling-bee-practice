@@ -378,14 +378,116 @@ export class PDFParsingService {
   }
 
   private extractWordsFromText(text: string): string[] {
+    console.log('Processing text for intelligent word extraction...')
+    console.log('Text preview:', text.substring(0, 1000))
+    
+    // Split text into lines for better analysis
+    const lines = text.split(/\n+/)
+    console.log('Total lines found:', lines.length)
+    
+    const words: string[] = []
+    let inWordListSection = false
+    let consecutiveWordLines = 0
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim()
+      
+      // Skip empty lines
+      if (line.length === 0) continue
+      
+      console.log(`Line ${i}: "${line}"`)
+      
+      // Detect if we're entering a word list section
+      if (this.isWordListHeader(line)) {
+        console.log('Found word list header, starting word extraction')
+        inWordListSection = true
+        consecutiveWordLines = 0
+        continue
+      }
+      
+      // Detect if we're leaving a word list section
+      if (inWordListSection && this.isEndOfWordList(line)) {
+        console.log('Found end of word list, stopping extraction')
+        inWordListSection = false
+        break
+      }
+      
+      // If we're in a word list section, extract words from this line
+      if (inWordListSection) {
+        const lineWords = this.extractWordsFromLine(line)
+        if (lineWords.length > 0) {
+          words.push(...lineWords)
+          consecutiveWordLines++
+          console.log(`Line ${i} contributed ${lineWords.length} words:`, lineWords)
+        } else {
+          // If we've been getting words and suddenly hit a line with no words,
+          // we might be at the end of the word list
+          if (consecutiveWordLines > 3) {
+            console.log('No words found after several word lines, might be end of list')
+            consecutiveWordLines = 0
+          }
+        }
+      } else {
+        // Try to detect word list patterns even without explicit headers
+        const lineWords = this.extractWordsFromLine(line)
+        if (lineWords.length >= 3) { // Lines with 3+ words might be part of word list
+          console.log(`Potential word list line (${lineWords.length} words):`, lineWords)
+          words.push(...lineWords)
+          consecutiveWordLines++
+        } else {
+          consecutiveWordLines = 0
+        }
+      }
+    }
+    
+    // If we didn't find a clear word list section, try to filter intelligently
+    if (words.length === 0) {
+      console.log('No clear word list found, trying intelligent filtering...')
+      return this.intelligentWordFiltering(text)
+    }
+    
+    console.log('Extracted words count:', words.length)
+    console.log('Sample words:', words.slice(0, 20))
+    
+    return words
+  }
+  
+  private isWordListHeader(line: string): boolean {
+    const lowerLine = line.toLowerCase()
+    const headers = [
+      'word list',
+      'words',
+      'spelling words',
+      'vocabulary',
+      'terms',
+      'definitions',
+      'list of words',
+      'word bank'
+    ]
+    
+    return headers.some(header => lowerLine.includes(header))
+  }
+  
+  private isEndOfWordList(line: string): boolean {
+    const lowerLine = line.toLowerCase()
+    const endings = [
+      'end of',
+      'conclusion',
+      'summary',
+      'notes',
+      'references',
+      'bibliography',
+      'appendix'
+    ]
+    
+    return endings.some(ending => lowerLine.includes(ending))
+  }
+  
+  private extractWordsFromLine(line: string): string[] {
     const words: string[] = []
     
-    console.log('Processing text for word extraction...')
-    console.log('Text preview:', text.substring(0, 500))
-    
-    // Split by any whitespace and extract words
-    const tokens = text.split(/\s+/)
-    console.log('Total tokens found:', tokens.length)
+    // Split by whitespace and extract words
+    const tokens = line.split(/\s+/)
     
     for (const token of tokens) {
       // Clean the token
@@ -394,16 +496,74 @@ export class PDFParsingService {
         .replace(/^[^a-z]+|[^a-z]+$/g, '') // Remove leading/trailing non-letters
         .trim()
       
-      // Check if it's a valid word
-      if (cleaned.length >= 1 && cleaned.length <= 50 && /^[a-z\-']+$/.test(cleaned)) {
+      // Check if it's a valid word for spelling practice
+      if (this.isValidSpellingWord(cleaned)) {
         words.push(cleaned)
       }
     }
     
-    console.log('Raw extracted words count:', words.length)
-    console.log('Sample words:', words.slice(0, 20))
-    
     return words
+  }
+  
+  private isValidSpellingWord(word: string): boolean {
+    // Length check
+    if (word.length < 2 || word.length > 20) return false
+    
+    // Must contain only letters, hyphens, and apostrophes
+    if (!/^[a-z\-']+$/.test(word)) return false
+    
+    // Avoid common non-word tokens
+    const noiseWords = [
+      'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
+      'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had',
+      'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can',
+      'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they',
+      'page', 'chapter', 'section', 'part', 'number', 'date', 'time', 'year', 'month',
+      'copyright', 'all', 'rights', 'reserved', 'www', 'http', 'https', 'com', 'org'
+    ]
+    
+    if (noiseWords.includes(word)) return false
+    
+    // Avoid words with too many repeated characters
+    if (/([a-z])\1{2,}/.test(word)) return false
+    
+    // Avoid single letters unless they're common (a, i)
+    if (word.length === 1 && !['a', 'i'].includes(word)) return false
+    
+    return true
+  }
+  
+  private intelligentWordFiltering(text: string): string[] {
+    console.log('Applying intelligent word filtering...')
+    
+    const allWords: string[] = []
+    const lines = text.split(/\n+/)
+    
+    for (const line of lines) {
+      const words = this.extractWordsFromLine(line)
+      allWords.push(...words)
+    }
+    
+    // Group words by frequency to find the main word list
+    const wordCounts = new Map<string, number>()
+    for (const word of allWords) {
+      wordCounts.set(word, (wordCounts.get(word) || 0) + 1)
+    }
+    
+    // Filter out very common words and very rare words
+    const filteredWords: string[] = []
+    for (const [word, count] of wordCounts) {
+      // Only include words that appear 1-3 times (likely part of word list)
+      // and are not too common overall
+      if (count >= 1 && count <= 3 && word.length >= 3) {
+        filteredWords.push(word)
+      }
+    }
+    
+    console.log('Intelligently filtered words count:', filteredWords.length)
+    console.log('Sample filtered words:', filteredWords.slice(0, 20))
+    
+    return filteredWords
   }
 
 
