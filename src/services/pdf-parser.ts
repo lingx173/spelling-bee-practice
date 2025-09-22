@@ -1,9 +1,17 @@
 import * as pdfjsLib from 'pdfjs-dist'
 
-// Configure PDF.js worker - disable worker completely for now
+// Configure PDF.js worker - use a local worker file
 console.log('Configuring PDF.js worker...')
-pdfjsLib.GlobalWorkerOptions.workerSrc = null as any
-console.log('PDF.js worker disabled - using main thread')
+try {
+  // Try to use a local worker file first
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js'
+  console.log('PDF.js worker configured with local file')
+} catch (error) {
+  console.warn('Local worker failed, trying CDN fallback')
+  // Fallback to CDN
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`
+  console.log('PDF.js worker configured with CDN')
+}
 
 export interface PDFParseResult {
   words: string[]
