@@ -109,55 +109,74 @@ export class PDFParsingService {
   private async performOCR(file: File): Promise<string[]> {
     console.log('Starting OCR processing for file:', file.name)
     
-    let worker: any = null
-    
     try {
-      // Dynamically import Tesseract.js to reduce initial bundle size
-      const { createWorker } = await import('tesseract.js')
+      // Try to dynamically import Tesseract.js with timeout
+      const tesseractModule = await Promise.race([
+        import('tesseract.js'),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Tesseract.js loading timeout')), 10000)
+        )
+      ]) as any
+
+      const { createWorker } = tesseractModule
+      let worker: any = null
       
-      // Create a worker for OCR processing
-      worker = await createWorker('eng', 1, {
-        logger: m => {
-          if (m.status === 'recognizing text') {
-            console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`)
+      try {
+        // Create a worker for OCR processing with timeout
+        worker = await Promise.race([
+          createWorker('eng', 1, {
+            logger: (m: any) => {
+              if (m.status === 'recognizing text') {
+                console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`)
+              }
+            }
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('OCR worker creation timeout')), 15000)
+          )
+        ]) as any
+
+        // Convert PDF to image (first page only for now)
+        const imageDataUrl = await this.convertPDFToImage(file)
+        
+        if (!imageDataUrl) {
+          throw new Error('Failed to convert PDF to image')
+        }
+
+        // Perform OCR on the image with timeout
+        const ocrResult = await Promise.race([
+          worker.recognize(imageDataUrl),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('OCR processing timeout')), 30000)
+          )
+        ]) as any
+        
+        const text = ocrResult.data.text
+        console.log('OCR extracted text length:', text.length)
+        console.log('OCR extracted text sample:', text.substring(0, 1000))
+        
+        // Extract and clean words from OCR text
+        const words = this.extractWordsFromText(text)
+        const cleanedWords = this.cleanAndDeduplicateWords(words)
+        
+        console.log('OCR found', cleanedWords.length, 'unique words')
+        console.log('Sample cleaned words:', cleanedWords.slice(0, 30))
+        
+        return cleanedWords
+      } finally {
+        // Clean up the worker
+        if (worker) {
+          try {
+            await worker.terminate()
+          } catch (error) {
+            console.warn('Error terminating OCR worker:', error)
           }
         }
-      })
-
-      // Convert PDF to image (first page only for now)
-      const imageDataUrl = await this.convertPDFToImage(file)
-      
-      if (!imageDataUrl) {
-        throw new Error('Failed to convert PDF to image')
       }
-
-      // Perform OCR on the image
-      const ocrResult = await worker.recognize(imageDataUrl)
-      
-      const text = ocrResult.data.text
-      console.log('OCR extracted text length:', text.length)
-      console.log('OCR extracted text sample:', text.substring(0, 1000))
-      
-      // Extract and clean words from OCR text
-      const words = this.extractWordsFromText(text)
-      const cleanedWords = this.cleanAndDeduplicateWords(words)
-      
-      console.log('OCR found', cleanedWords.length, 'unique words')
-      console.log('Sample cleaned words:', cleanedWords.slice(0, 30))
-      
-      return cleanedWords
     } catch (error) {
       console.error('OCR processing failed:', error)
-      throw error
-    } finally {
-      // Clean up the worker
-      if (worker) {
-        try {
-          await worker.terminate()
-        } catch (error) {
-          console.warn('Error terminating OCR worker:', error)
-        }
-      }
+      // Return empty array instead of throwing to allow fallback
+      return []
     }
   }
 

@@ -2,7 +2,6 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
 import { useWords } from './hooks/useWords'
 import { ttsService } from './services/tts'
-import { pdfParsingService } from './services/pdf-parser'
 
 function Home() {
   const { words } = useWords()
@@ -624,6 +623,8 @@ function Upload() {
     }, 3000)
     
     try {
+      // Dynamically import PDF parsing service to avoid blocking initial load
+      const { pdfParsingService } = await import('./services/pdf-parser')
       const result = await pdfParsingService.parseFile(file)
       console.log('PDF processing result:', result)
       
@@ -655,7 +656,21 @@ function Upload() {
     } catch (error) {
       console.error('PDF processing error:', error)
       setUploadStatus('error')
-      const errorMessage = error instanceof Error ? error.message : 'Failed to process PDF. Please try again.'
+      
+      // Provide more helpful error messages
+      let errorMessage = 'Failed to process PDF. Please try again.'
+      if (error instanceof Error) {
+        if (error.message.includes('timeout')) {
+          errorMessage = 'PDF processing timed out. The file might be too large or complex.'
+        } else if (error.message.includes('Invalid file')) {
+          errorMessage = 'Invalid PDF file. Please check the file and try again.'
+        } else if (error.message.includes('File too large')) {
+          errorMessage = 'File is too large. Please upload a PDF smaller than 50MB.'
+        } else {
+          errorMessage = `PDF processing failed: ${error.message}`
+        }
+      }
+      
       setMessage(errorMessage)
       setTimeout(() => {
         setUploadStatus('idle')
