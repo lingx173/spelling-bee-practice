@@ -145,82 +145,17 @@ export class PDFParsingService {
 
   private async extractTextFromPDF(file: File): Promise<string[]> {
     try {
-      console.log('Extracting text from PDF...')
+      console.log('=== STARTING PDF TEXT EXTRACTION ===')
+      console.log('File name:', file.name)
+      console.log('File size:', file.size)
+      console.log('File type:', file.type)
       
       // Load the PDF using PDF.js with timeout
       const arrayBuffer = await file.arrayBuffer()
       console.log('PDF array buffer size:', arrayBuffer.byteLength)
       
-      const pdf = await Promise.race([
-        pdfjsLib.getDocument({ 
-          data: arrayBuffer,
-          verbosity: 0
-        }).promise,
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('PDF loading timeout')), 15000)
-        )
-      ]) as any
-
-      console.log('PDF loaded, pages:', pdf.numPages)
-
-      let allText = ''
-      
-      // Extract text from all pages
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        console.log(`Processing page ${pageNum} of ${pdf.numPages}`)
-        const page = await pdf.getPage(pageNum)
-        const textContent = await page.getTextContent()
-        
-        console.log(`Page ${pageNum} text items:`, textContent.items.length)
-        
-        const pageText = textContent.items
-          .map((item: any) => item.str)
-          .join(' ')
-        
-        console.log(`Page ${pageNum} text length:`, pageText.length)
-        console.log(`Page ${pageNum} text sample:`, pageText.substring(0, 200))
-        
-        allText += pageText + ' '
-      }
-
-      console.log('Extracted text length:', allText.length)
-      console.log('Extracted text sample:', allText.substring(0, 500))
-
-      // Extract and clean words from text
-      const words = this.extractWordsFromText(allText)
-      const cleanedWords = this.cleanAndDeduplicateWords(words)
-      
-      console.log('Text extraction found', cleanedWords.length, 'unique words')
-      console.log('Sample cleaned words:', cleanedWords.slice(0, 30))
-      
-      // If no words found, try alternative text extraction
-      if (cleanedWords.length === 0) {
-        console.log('No words found with standard extraction, trying alternative method...')
-        const altWords = await this.extractTextAlternative(file)
-        if (altWords.length > 0) {
-          return altWords
-        }
-        
-        // If still no words, try a very basic text extraction
-        console.log('Trying basic text extraction...')
-        return await this.extractTextBasic(file)
-      }
-      
-      return cleanedWords
-    } catch (error) {
-      console.error('Text extraction failed:', error)
-      // Try alternative method as fallback
-      console.log('Trying alternative text extraction...')
-      return await this.extractTextAlternative(file)
-    }
-  }
-
-  private async extractTextAlternative(file: File): Promise<string[]> {
-    try {
-      console.log('Trying alternative text extraction method...')
-      
-      // Load the PDF using PDF.js with different settings
-      const arrayBuffer = await file.arrayBuffer()
+      // Try to load PDF with minimal configuration
+      console.log('Attempting to load PDF with PDF.js...')
       const pdf = await pdfjsLib.getDocument({ 
         data: arrayBuffer,
         verbosity: 0,
@@ -228,102 +163,67 @@ export class PDFParsingService {
         isEvalSupported: false
       }).promise
 
-      console.log('Alternative PDF loaded, pages:', pdf.numPages)
+      console.log('✅ PDF loaded successfully!')
+      console.log('Number of pages:', pdf.numPages)
 
       let allText = ''
       
-      // Try to extract text using renderTextContent method
+      // Extract text from all pages
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        console.log(`Alternative processing page ${pageNum}`)
+        console.log(`\n--- Processing page ${pageNum} of ${pdf.numPages} ---`)
         const page = await pdf.getPage(pageNum)
+        console.log('Page loaded, getting text content...')
         
-        // Try different text extraction methods
-        try {
-          const textContent = await page.getTextContent()
-          const pageText = textContent.items
-            .map((item: any) => item.str)
-            .join(' ')
-          allText += pageText + ' '
-          console.log(`Alternative page ${pageNum} text:`, pageText.substring(0, 100))
-        } catch (pageError) {
-          console.warn(`Failed to extract text from page ${pageNum}:`, pageError)
-        }
-      }
-
-      console.log('Alternative extracted text length:', allText.length)
-      
-      if (allText.trim().length > 0) {
-        const words = this.extractWordsFromText(allText)
-        const cleanedWords = this.cleanAndDeduplicateWords(words)
-        console.log('Alternative method found', cleanedWords.length, 'words')
-        return cleanedWords
-      }
-      
-      return []
-    } catch (error) {
-      console.error('Alternative text extraction failed:', error)
-      return []
-    }
-  }
-
-  private async extractTextBasic(file: File): Promise<string[]> {
-    try {
-      console.log('Trying basic text extraction...')
-      
-      // Load the PDF using PDF.js with minimal settings
-      const arrayBuffer = await file.arrayBuffer()
-      const pdf = await pdfjsLib.getDocument({ 
-        data: arrayBuffer,
-        verbosity: 0,
-        useWorkerFetch: false,
-        isEvalSupported: false,
-        useSystemFonts: false,
-        disableFontFace: false,
-        disableAutoFetch: true,
-        disableStream: true
-      }).promise
-
-      console.log('Basic PDF loaded, pages:', pdf.numPages)
-
-      let allText = ''
-      
-      // Extract text from all pages using basic method
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        console.log(`Basic processing page ${pageNum}`)
-        const page = await pdf.getPage(pageNum)
-        
-        // Try to get text content
         const textContent = await page.getTextContent()
         console.log(`Page ${pageNum} has ${textContent.items.length} text items`)
         
-        // Extract text from items
+        // Log each text item for debugging
+        textContent.items.forEach((item: any, index: number) => {
+          if (index < 10) { // Only log first 10 items to avoid spam
+            console.log(`Item ${index}: "${item.str}" (width: ${item.width}, height: ${item.height})`)
+          }
+        })
+        
         const pageText = textContent.items
-          .map((item: any) => {
-            console.log('Text item:', item.str, 'transform:', item.transform)
-            return item.str
-          })
+          .map((item: any) => item.str)
           .join(' ')
         
+        console.log(`Page ${pageNum} extracted text length:`, pageText.length)
         console.log(`Page ${pageNum} extracted text:`, pageText)
+        
         allText += pageText + ' '
       }
 
-      console.log('Basic extracted text length:', allText.length)
-      console.log('Basic extracted text:', allText)
-      
-      if (allText.trim().length > 0) {
-        const words = this.extractWordsFromText(allText)
-        const cleanedWords = this.cleanAndDeduplicateWords(words)
-        console.log('Basic method found', cleanedWords.length, 'words')
-        return cleanedWords
+      console.log('\n=== EXTRACTION SUMMARY ===')
+      console.log('Total extracted text length:', allText.length)
+      console.log('Total extracted text:', allText)
+
+      if (allText.trim().length === 0) {
+        console.log('❌ No text extracted from PDF!')
+        return []
       }
+
+      // Extract and clean words from text
+      console.log('Processing extracted text into words...')
+      const words = this.extractWordsFromText(allText)
+      console.log('Raw words found:', words.length)
+      console.log('Raw words sample:', words.slice(0, 20))
       
-      return []
+      const cleanedWords = this.cleanAndDeduplicateWords(words)
+      console.log('✅ Cleaned words found:', cleanedWords.length)
+      console.log('Cleaned words sample:', cleanedWords.slice(0, 30))
+      
+      return cleanedWords
     } catch (error) {
-      console.error('Basic text extraction failed:', error)
+      console.error('❌ Text extraction failed:', error)
+      if (error instanceof Error) {
+        console.error('Error message:', error.message)
+        console.error('Error stack:', error.stack)
+      }
       return []
     }
   }
+
 
   private async performOCR(file: File): Promise<string[]> {
     console.log('Starting OCR processing for file:', file.name)
@@ -456,23 +356,24 @@ export class PDFParsingService {
 
   private extractWordsFromText(text: string): string[] {
     const words: string[] = []
-    const lines = text.split('\n')
     
-    console.log('OCR extracted text preview:', text.substring(0, 500))
-    console.log('Total lines to process:', lines.length)
+    console.log('Processing text for word extraction...')
+    console.log('Text preview:', text.substring(0, 500))
     
-    for (const line of lines) {
-      // Skip if line looks like noise
-      if (this.isNoiseLine(line)) {
-        continue
-      }
+    // Split by any whitespace and extract words
+    const tokens = text.split(/\s+/)
+    console.log('Total tokens found:', tokens.length)
+    
+    for (const token of tokens) {
+      // Clean the token
+      const cleaned = token
+        .toLowerCase()
+        .replace(/^[^a-z]+|[^a-z]+$/g, '') // Remove leading/trailing non-letters
+        .trim()
       
-      // Extract words using more flexible regex
-      // Match words that start with a letter and contain letters, hyphens, or apostrophes
-      const matches = line.match(/[A-Za-z][A-Za-z\-']*/g)
-      if (matches) {
-        console.log('Line matches:', line, '->', matches)
-        words.push(...matches)
+      // Check if it's a valid word
+      if (cleaned.length >= 1 && cleaned.length <= 50 && /^[a-z\-']+$/.test(cleaned)) {
+        words.push(cleaned)
       }
     }
     
@@ -482,30 +383,6 @@ export class PDFParsingService {
     return words
   }
 
-  private isNoiseLine(line: string): boolean {
-    const trimmed = line.trim()
-    
-    // Empty or very short lines
-    if (trimmed.length < 2) {
-      return true
-    }
-    
-    // Check against noise patterns
-    const noisePatterns = [
-      /^page\s+\d+$/i,
-      /^\d+$/,
-      /^\d+\s*of\s*\d+$/i,
-      /^chapter\s+\d+/i,
-      /^section\s+\d+/i,
-      /^\d{1,2}\/\d{1,2}\/\d{2,4}$/,
-      /^\w{3}\s+\d{1,2},?\s+\d{4}$/i, // dates
-      /^copyright/i,
-      /^all\s+rights\s+reserved/i,
-      /^table\s+of\s+contents/i,
-    ]
-    
-    return noisePatterns.some(pattern => pattern.test(trimmed))
-  }
 
   private cleanAndDeduplicateWords(words: string[]): string[] {
     const cleanedWords = new Set<string>()
