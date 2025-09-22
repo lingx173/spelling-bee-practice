@@ -438,11 +438,7 @@ function Words() {
           <h1 className="text-3xl font-bold text-gray-800">Word List</h1>
           <div className="flex gap-4">
             <button
-              onClick={() => {
-                if (confirm('Are you sure you want to clear all words?')) {
-                  clearAllWords()
-                }
-              }}
+              onClick={() => clearAllWords()}
               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
             >
               Clear All
@@ -516,11 +512,7 @@ function Words() {
                     </div>
                   </div>
                   <button
-                    onClick={() => {
-                      if (confirm(`Delete "${word.text}"?`)) {
-                        deleteWord(word.id)
-                      }
-                    }}
+                    onClick={() => deleteWord(word.id)}
                     className="px-3 py-1 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                   >
                     Delete
